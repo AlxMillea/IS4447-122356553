@@ -1,98 +1,151 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useEffect, useMemo, useState } from "react";
+import { Button, Text, TextInput, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  deleteLog,
+  getCategoriesWithHabits,
+  getLogsForToday,
+  insertLog,
+  updateLog,
+  type CategoryWithHabits,
+  type HabitLogRow,
+} from "../../db/db-repo";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const CHICAGO_TRIP_DATE = new Date("2026-07-01T00:00:00");
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [dayType, setDayType] = useState<"Gym" | "Football" | "Rest">("Gym");
+  const [pillars, setPillars] = useState<CategoryWithHabits[]>([]);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const daysUntilChicago = useMemo(() => {
+    const now = new Date();
+    const diffMs = CHICAGO_TRIP_DATE.getTime() - now.getTime();
+    return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+  }, []);
+
+  const [logs, setLogs] = useState<HabitLogRow[]>([]);
+  const [valueInput, setValueInput] = useState("");
+  const [notesInput, setNotesInput] = useState("");
+  const [editingLogId, setEditingLogId] = useState<number | null>(null);
+
+  const firstHabitId = useMemo(
+    () => pillars.flatMap((c) => c.habits)[0]?.id ?? null,
+    [pillars],
+  );
+
+  const refreshTodayLogs = async () => {
+    const todayLogs = await getLogsForToday();
+    setLogs(todayLogs);
+  };
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const data = await getCategoriesWithHabits();
+        if (mounted) setPillars(data);
+        if (mounted) await refreshTodayLogs();
+      } catch (error) {
+        console.error("Failed to load home data:", error);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const onSubmitLog = async () => {
+    if (!firstHabitId) return;
+    const parsed = Number(valueInput);
+    if (Number.isNaN(parsed)) return;
+
+    if (editingLogId !== null) {
+      await updateLog(editingLogId, parsed, notesInput);
+      setEditingLogId(null);
+    } else {
+      await insertLog(firstHabitId, parsed, notesInput);
+    }
+
+    setValueInput("");
+    setNotesInput("");
+    await refreshTodayLogs();
+  };
+
+  const onEditLog = (log: HabitLogRow) => {
+    setEditingLogId(log.id);
+    setValueInput(String(log.value));
+    setNotesInput(log.notes ?? "");
+  };
+
+  const onDeleteLog = async (logId: number) => {
+    await deleteLog(logId);
+    if (editingLogId === logId) {
+      setEditingLogId(null);
+      setValueInput("");
+      setNotesInput("");
+    }
+    await refreshTodayLogs();
+  };
+
+  return (
+    <SafeAreaView style={{ flex: 1 }}>
+      <View>
+        <Text>Days until Chicago: {daysUntilChicago}</Text>
+
+        <Text>Day Type: {dayType}</Text>
+        <Button title="Gym" onPress={() => setDayType("Gym")} />
+        <Button title="Football" onPress={() => setDayType("Football")} />
+        <Button title="Rest" onPress={() => setDayType("Rest")} />
+
+        {pillars.map((category) => (
+          <View key={category.id}>
+            <Text>{category.name}</Text>
+            {category.habits.length === 0 ? (
+              <Text>No habits yet</Text>
+            ) : (
+              category.habits.map((habit) => (
+                <Text key={habit.id}>- {habit.name}</Text>
+              ))
+            )}
+          </View>
+        ))}
+
+        <Text>{`Today's Logs (CRUD Test)`}</Text>
+        <Text>Habit ID (hardcoded first habit): {firstHabitId ?? "N/A"}</Text>
+        <TextInput
+          placeholder="Value"
+          value={valueInput}
+          onChangeText={setValueInput}
+          keyboardType="numeric"
+        />
+        <TextInput
+          placeholder="Notes"
+          value={notesInput}
+          onChangeText={setNotesInput}
+        />
+        <Button
+          title={editingLogId !== null ? "Update Log" : "Add Log"}
+          onPress={onSubmitLog}
+        />
+
+        {logs.map((log) => (
+          <View key={log.id}>
+            <Text>
+              #{log.id} | habit {log.habitId} | {log.date} | {log.value} |{" "}
+              {log.notes ?? ""}
+            </Text>
+            <Button title="Edit" onPress={() => onEditLog(log)} />
+            <Button title="Delete" onPress={() => onDeleteLog(log.id)} />
+          </View>
+        ))}
+
+        <Button
+          title="Open 60-Second Log"
+          onPress={() => console.log("Log placeholder")}
+        />
+      </View>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
