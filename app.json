@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "IS4447-122356553",
-    "slug": "IS4447-122356553",
+    "slug": "alxs-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -43,6 +43,19 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f746f00a-9ad6-46b6-96bf-b4ab2e5802f5"
+      }
+    },
+    "owner": "is4447-project-122356553",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f746f00a-9ad6-46b6-96bf-b4ab2e5802f5"
     }
   }
 }
