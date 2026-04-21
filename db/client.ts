@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS habit_logs (
     ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name);
 CREATE INDEX IF NOT EXISTS idx_habits_category_id ON habits(category_id);
 CREATE INDEX IF NOT EXISTS idx_targets_habit_id ON targets(habit_id);
 CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_id_date ON habit_logs(habit_id, date);
