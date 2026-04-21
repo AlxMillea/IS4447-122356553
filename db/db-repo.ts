@@ -178,6 +178,21 @@ export async function insertLogAtDate(
   });
 }
 
+export async function insertRecord(params: {
+  habitId: number;
+  date: string;
+  value: number;
+  notes?: string;
+}) {
+  const { habitId, date, value, notes } = params;
+  await db.insert(habitLogs).values({
+    habitId,
+    date: date.trim(),
+    value,
+    notes: notes?.trim() ? notes.trim() : null,
+  });
+}
+
 export async function updateLog(
   logId: number,
   newValue: number,
@@ -188,6 +203,26 @@ export async function updateLog(
     .set({
       value: newValue,
       notes: newNotes?.trim() ? newNotes.trim() : null,
+    })
+    .where(eq(habitLogs.id, logId));
+}
+
+export async function updateRecord(
+  logId: number,
+  updates: {
+    value: number;
+    notes?: string;
+    date?: string;
+    habitId?: number;
+  },
+) {
+  await db
+    .update(habitLogs)
+    .set({
+      value: updates.value,
+      notes: updates.notes?.trim() ? updates.notes.trim() : null,
+      date: updates.date?.trim(),
+      habitId: updates.habitId,
     })
     .where(eq(habitLogs.id, logId));
 }

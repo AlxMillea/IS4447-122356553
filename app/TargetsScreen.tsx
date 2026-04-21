@@ -2,25 +2,37 @@ import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import {
-    getHabitLogsByHabitIds,
-    getHabitsByNames,
-    parseDayMonthYear,
-    getTargetsWithHabits,
+  getHabitLogsByHabitIds,
+  getHabitsByNames,
+  getTargetsWithHabits,
+  parseDayMonthYear,
 } from "../db/db-repo";
 import { theme } from "../theme/theme";
 
 const GREEN = "#22C55E";
 const RED = "#EF4444";
 
+type LogRow = { habitId: number; date: string; value: number };
+type TargetRow = {
+  habitId: number;
+  habitName: string;
+  period: string;
+  targetValue: number;
+};
+
+function startOfDay(value: Date): Date {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
 export default function TargetsScreen() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [logs, setLogs] = useState<any[]>([]);
+  const [rows, setRows] = useState<TargetRow[]>([]);
+  const [logs, setLogs] = useState<LogRow[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       (async () => {
-        const targets = await getTargetsWithHabits();
+        const targets = (await getTargetsWithHabits()) as TargetRow[];
         const habits = await getHabitsByNames([
           "Gym Session",
           "Football Session",
@@ -30,7 +42,7 @@ export default function TargetsScreen() {
           "Water Intake (ml)",
         ]);
         const habitIds = habits.map((h) => h.id);
-        const allLogs = await getHabitLogsByHabitIds(habitIds);
+        const allLogs = (await getHabitLogsByHabitIds(habitIds)) as LogRow[];
         if (!active) return;
         setRows(targets);
         setLogs(allLogs);
@@ -49,42 +61,66 @@ export default function TargetsScreen() {
     return sorted[sorted.length - 1] ?? null;
   }, [logs]);
 
+  const referenceDateObj = useMemo(
+    () => (referenceDate ? startOfDay(parseDayMonthYear(referenceDate)) : null),
+    [referenceDate],
+  );
+
+  const logsInLastDays = useCallback(
+    (days: number) => {
+      if (!referenceDateObj) return [];
+      const maxDiff = (days - 1) * 24 * 60 * 60 * 1000;
+      return logs.filter((row) => {
+        const rowDate = startOfDay(parseDayMonthYear(row.date));
+        const diff = referenceDateObj.getTime() - rowDate.getTime();
+        return diff >= 0 && diff <= maxDiff;
+      });
+    },
+    [logs, referenceDateObj],
+  );
+
   const referenceLogs = useMemo(
     () => (referenceDate ? logs.filter((l) => l.date === referenceDate) : []),
     [logs, referenceDate],
   );
 
-  const countLogs = (habitName: string, minValue = 1) => {
-    const target = rows.find((r) => r.habitName === habitName);
-    if (!target) return 0;
-    return logs.filter(
-      (l) => l.habitId === target.habitId && l.value >= minValue,
-    ).length;
-  };
+  const countLogs = useCallback(
+    (habitName: string, options?: { minValue?: number; days?: number }) => {
+      const target = rows.find((r) => r.habitName === habitName);
+      if (!target) return 0;
+      const minValue = options?.minValue ?? 1;
+      const source = options?.days ? logsInLastDays(options.days) : logs;
+      return source.filter(
+        (l) => l.habitId === target.habitId && l.value >= minValue,
+      ).length;
+    },
+    [logs, logsInLastDays, rows],
+  );
 
-  const proteinHitDays = (() => {
-    const target = rows.find((r) => r.habitName === "Hit 185g Protein");
-    if (!target) return 0;
-    return new Set(
-      logs
-        .filter((l) => l.habitId === target.habitId && l.value >= 185)
-        .map((l) => l.date),
-    ).size;
-  })();
+  const proteinHitDays = useCallback(
+    (days?: number) => {
+      const target = rows.find((r) => r.habitName === "Hit 185g Protein");
+      if (!target) return 0;
+      const source = days ? logsInLastDays(days) : logs;
+      return new Set(
+        source
+          .filter((l) => l.habitId === target.habitId && l.value >= 185)
+          .map((l) => l.date),
+      ).size;
+    },
+    [logs, logsInLastDays, rows],
+  );
 
   const dailyValue = (habitName: string) => {
-    const t = rows.find((r) => r.habitName === habitName);
-    if (!t) return null;
-    const found = referenceLogs.find((l) => l.habitId === t.habitId);
+    const target = rows.find((r) => r.habitName === habitName);
+    if (!target) return null;
+    const found = referenceLogs.find((l) => l.habitId === target.habitId);
     return found?.value ?? null;
   };
 
-  const getTarget = (habitName: string, period: string, fallback: number) => {
-    return (
-      rows.find((r) => r.habitName === habitName && r.period === period)
-        ?.targetValue ?? fallback
-    );
-  };
+  const getTarget = (habitName: string, period: string, fallback: number) =>
+    rows.find((r) => r.habitName === habitName && r.period === period)
+      ?.targetValue ?? fallback;
 
   const Progress = ({
     label,
@@ -97,7 +133,6 @@ export default function TargetsScreen() {
     target: number;
     mode: "min" | "max";
   }) => {
-    const hasLog = done > 0 || mode === "max";
     const pct = Math.max(0, Math.min(100, (done / target) * 100));
     const exceededBad = mode === "max" && done > target;
     const unmet = mode === "min" && done < target;
@@ -124,9 +159,7 @@ export default function TargetsScreen() {
               : `${Math.round(target - done)} remaining`
             : done >= target
               ? `On track`
-              : hasLog
-                ? `${Math.round(target - done)} remaining`
-                : `Unmet today`}
+              : `${Math.round(target - done)} remaining (unmet so far)`}
         </Text>
       </View>
     );
@@ -138,7 +171,6 @@ export default function TargetsScreen() {
       contentContainerStyle={{ paddingBottom: 24 }}
     >
       <Text style={styles.title}>Global Targets (5 Weeks)</Text>
-
       <Progress
         label="Gym Sessions (20)"
         done={countLogs("Gym Session")}
@@ -153,15 +185,53 @@ export default function TargetsScreen() {
       />
       <Progress
         label="Protein Days ≥185g (35)"
-        done={proteinHitDays}
+        done={proteinHitDays()}
         target={getTarget("Hit 185g Protein", "global_5w", 35)}
         mode="min"
       />
 
-      <Text style={styles.title}>Weekly / Daily Baselines (Week 5)</Text>
-      <Text style={styles.secondary}>
-        Using logs from: {referenceDate ?? "N/A"}
-      </Text>
+      <Text style={styles.title}>Weekly Targets (Last 7 Days)</Text>
+      <Progress
+        label="Gym Sessions (weekly)"
+        done={countLogs("Gym Session", { days: 7 })}
+        target={getTarget("Gym Session", "weekly", 4)}
+        mode="min"
+      />
+      <Progress
+        label="Football Sessions (weekly)"
+        done={countLogs("Football Session", { days: 7 })}
+        target={getTarget("Football Session", "weekly", 1)}
+        mode="min"
+      />
+      <Progress
+        label="Protein Days ≥185g (weekly)"
+        done={proteinHitDays(7)}
+        target={getTarget("Hit 185g Protein", "weekly", 7)}
+        mode="min"
+      />
+
+      <Text style={styles.title}>Monthly Targets (Last 30 Days)</Text>
+      <Progress
+        label="Gym Sessions (monthly)"
+        done={countLogs("Gym Session", { days: 30 })}
+        target={getTarget("Gym Session", "monthly", 16)}
+        mode="min"
+      />
+      <Progress
+        label="Football Sessions (monthly)"
+        done={countLogs("Football Session", { days: 30 })}
+        target={getTarget("Football Session", "monthly", 4)}
+        mode="min"
+      />
+      <Progress
+        label="Protein Days ≥185g (monthly)"
+        done={proteinHitDays(30)}
+        target={getTarget("Hit 185g Protein", "monthly", 30)}
+        mode="min"
+      />
+
+      <Text style={styles.title}>Daily Baselines (Latest Day)</Text>
+      <Text style={styles.secondary}>Using logs from: {referenceDate ?? "N/A"}</Text>
       <Progress
         label="Gym Day Calories (≤2800)"
         done={dailyValue("Calories (Gym Day)") ?? 0}
@@ -197,6 +267,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginBottom: 10,
     marginTop: 8,
+    fontWeight: "700",
   },
   card: {
     backgroundColor: theme.colors.surface,
@@ -214,3 +285,4 @@ const styles = StyleSheet.create({
   },
   fill: { height: 10, borderRadius: 6 },
 });
+

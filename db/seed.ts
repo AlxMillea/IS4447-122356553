@@ -9,10 +9,10 @@ function formatDayMonthYear(date: Date): string {
 
 async function insertChicagoCountdownData(tx: any) {
   await tx.insert(categories).values([
-    { name: "Train", color: CATEGORY_COLORS.Train, icon: "" },
-    { name: "Fuel", color: CATEGORY_COLORS.Fuel, icon: "" },
-    { name: "Recover", color: CATEGORY_COLORS.Recover, icon: "" },
-    { name: "Measure", color: CATEGORY_COLORS.Measure, icon: "" },
+    { name: "Train", color: CATEGORY_COLORS.Train, icon: "dumbbell" },
+    { name: "Fuel", color: CATEGORY_COLORS.Fuel, icon: "fork-knife" },
+    { name: "Recover", color: CATEGORY_COLORS.Recover, icon: "moon" },
+    { name: "Measure", color: CATEGORY_COLORS.Measure, icon: "scale" },
   ]);
 
   const categoryRows = await tx.select().from(categories);
@@ -88,6 +88,36 @@ async function insertChicagoCountdownData(tx: any) {
       habitId: habitIdByName["Hit 185g Protein"],
       period: "global_5w",
       targetValue: 35,
+    },
+    {
+      habitId: habitIdByName["Gym Session"],
+      period: "weekly",
+      targetValue: 4,
+    },
+    {
+      habitId: habitIdByName["Football Session"],
+      period: "weekly",
+      targetValue: 1,
+    },
+    {
+      habitId: habitIdByName["Hit 185g Protein"],
+      period: "weekly",
+      targetValue: 7,
+    },
+    {
+      habitId: habitIdByName["Gym Session"],
+      period: "monthly",
+      targetValue: 16,
+    },
+    {
+      habitId: habitIdByName["Football Session"],
+      period: "monthly",
+      targetValue: 4,
+    },
+    {
+      habitId: habitIdByName["Hit 185g Protein"],
+      period: "monthly",
+      targetValue: 30,
     },
     {
       habitId: habitIdByName["Calories (Gym Day)"],
@@ -209,14 +239,16 @@ export async function seedIfEmpty() {
     .from(targets);
   const habitRows = await db.select({ name: habits.name }).from(habits);
   const categoryRows = await db
-    .select({ name: categories.name, color: categories.color })
+    .select({ name: categories.name, color: categories.color, icon: categories.icon })
     .from(categories);
 
   const hasOldIsoDates =
     latestLog.length > 0 &&
     typeof latestLog[0].date === "string" &&
     latestLog[0].date.includes("T");
-  const expectedTargetValues = [20, 5, 35, 2800, 2100, 185, 3500];
+  const expectedTargetValues = [
+    20, 5, 35, 4, 1, 7, 16, 30, 2800, 2100, 185, 3500,
+  ];
   const hasChicagoTargets = expectedTargetValues.every((v) =>
     targetRows.some((t) => Number(t.targetValue) === v),
   );
@@ -253,6 +285,9 @@ export async function seedIfEmpty() {
         String(c.color).trim().toLowerCase() === color.toLowerCase(),
     ),
   );
+  const hasCategoryIcons = categoryRows.every(
+    (category) => category.icon && String(category.icon).trim().length > 0,
+  );
 
   const shouldReseedExisting =
     existingCategoryCount > 0 &&
@@ -261,7 +296,8 @@ export async function seedIfEmpty() {
       !hasChicagoTargets ||
       !hasRequiredHabits ||
       !hasRequiredCategories ||
-      !hasExpectedCategoryColors);
+      !hasExpectedCategoryColors ||
+      !hasCategoryIcons);
 
   if (existingCategoryCount > 0 && !shouldReseedExisting) return;
 

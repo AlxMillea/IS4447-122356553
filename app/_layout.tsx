@@ -5,7 +5,8 @@ import {
   NavigationIndependentTree,
 } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { ChartLine, House, Settings, Target, User } from "lucide-react-native";
+import { useEffect, useState } from "react";
 import "react-native-gesture-handler";
 import "react-native-reanimated";
 import { runDbHealthcheck } from "../db/healthcheck";
@@ -13,7 +14,9 @@ import { seedIfEmpty } from "../db/seed";
 import { theme } from "../theme/theme";
 import HomeLogsScreen from "./HomeLogsScreen";
 import InsightsScreen from "./InsightsScreen";
+import LoginPage from "./LoginPage";
 import PlaceholderScreen from "./PlaceholderScreen";
+import ProfileScreen from "./ProfileScreen";
 import SettingsScreen from "./SettingsScreen";
 import TargetsScreen from "./TargetsScreen";
 
@@ -34,6 +37,12 @@ export default function RootLayout() {
     })();
   }, []);
 
+  const [isEntered, setIsEntered] = useState(false);
+
+  if (!isEntered) {
+    return <LoginPage onEnter={() => setIsEntered(true)} />;
+  }
+
   return (
     <NavigationIndependentTree>
       <NavigationContainer
@@ -51,7 +60,7 @@ export default function RootLayout() {
         }}
       >
         <Tab.Navigator
-          screenOptions={{
+          screenOptions={({ route }) => ({
             tabBarStyle: {
               backgroundColor: theme.colors.surface,
               borderTopColor: theme.colors.border,
@@ -60,13 +69,30 @@ export default function RootLayout() {
             tabBarInactiveTintColor: theme.colors.textSecondary,
             headerStyle: { backgroundColor: theme.colors.background },
             headerTintColor: theme.colors.textPrimary,
-          }}
+            tabBarIcon: ({ color, size }) => {
+              if (route.name === "Home") {
+                return <House size={size} color={color} />;
+              }
+              if (route.name === "Targets") {
+                return <Target size={size} color={color} />;
+              }
+              if (route.name === "Insights") {
+                return <ChartLine size={size} color={color} />;
+              }
+              if (route.name === "Settings") {
+                return <Settings size={size} color={color} />;
+              }
+              return <User size={size} color={color} />;
+            },
+          })}
         >
           <Tab.Screen name="Home" component={HomeLogsScreen} />
           <Tab.Screen name="Targets" component={TargetsScreen} />
           <Tab.Screen name="Insights" component={InsightsScreen} />
           <Tab.Screen name="Settings" component={SettingsScreen} />
-          <Tab.Screen name="Profile" component={ProfilePlaceholder} />
+          <Tab.Screen name="Profile">
+            {() => <ProfileScreen onLogout={() => setIsEntered(false)} />}
+          </Tab.Screen>
         </Tab.Navigator>
         <StatusBar style="dark" />
       </NavigationContainer>

@@ -14,12 +14,15 @@ import { normalizeCategoryColor } from "../constants/category-colors";
 import {
   deleteLog,
   formatDayMonthYear,
+  getCategoriesWithHabits,
   getHabitLogsByHabitIds,
   getHabitsByNames,
   getRecordHistory,
   getTargetsWithHabits,
+  insertRecord,
   parseDayMonthYear,
-  updateLog,
+  updateRecord,
+  type CategoryWithHabits,
   type RecordHistoryRow,
 } from "../db/db-repo";
 import { theme } from "../theme/theme";
@@ -31,6 +34,39 @@ type TodayMetric = {
   name: string;
   value: number;
 };
+
+type CategoryOption = {
+  id: number;
+  name: string;
+  color: string;
+  icon: string;
+  defaultHabitId: number | null;
+};
+
+function isValidDayMonthYear(value: string): boolean {
+  const [dStr, mStr, yStr] = value.split("/");
+  const d = Number(dStr);
+  const m = Number(mStr);
+  const y = Number(yStr);
+  if (
+    !Number.isInteger(d) ||
+    !Number.isInteger(m) ||
+    !Number.isInteger(y) ||
+    y < 2000 ||
+    m < 1 ||
+    m > 12 ||
+    d < 1 ||
+    d > 31
+  ) {
+    return false;
+  }
+  const date = new Date(y, m - 1, d);
+  return (
+    date.getFullYear() === y &&
+    date.getMonth() === m - 1 &&
+    date.getDate() === d
+  );
+}
 
 export default function HomeOverviewScreen() {
   const now = new Date();
@@ -53,7 +89,15 @@ export default function HomeOverviewScreen() {
   const [editingHistoryId, setEditingHistoryId] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [editingNotes, setEditingNotes] = useState("");
+  const [editingDate, setEditingDate] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
   const [historyStatus, setHistoryStatus] = useState("");
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
+  const [createDate, setCreateDate] = useState(initialTo);
+  const [createCategoryId, setCreateCategoryId] = useState<number | null>(null);
+  const [createValue, setCreateValue] = useState("");
+  const [createNotes, setCreateNotes] = useState("");
+  const [createStatus, setCreateStatus] = useState("");
   const [globalTargets, setGlobalTargets] = useState({
     gymDone: 0,
     gymTarget: 20,
@@ -94,6 +138,7 @@ export default function HomeOverviewScreen() {
 
     const logs = await getHabitLogsByHabitIds(habits.map((h) => h.id));
     const history = await getRecordHistory();
+    const categoryHabitRows = (await getCategoriesWithHabits()) as CategoryWithHabits[];
     const todayLogs = logs.filter((l) => l.date === date);
 
     const todayMap: Record<string, number> = {};
@@ -107,6 +152,17 @@ export default function HomeOverviewScreen() {
     setTodayByName(todayMap);
     setTodayMetrics(todayRows);
     setHistoryRows(history);
+    const categoryOptionsMapped: CategoryOption[] = categoryHabitRows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      color: normalizeCategoryColor(row.color),
+      icon: row.icon,
+      defaultHabitId: row.habits[0]?.id ?? null,
+    }));
+    setCategoryOptions(categoryOptionsMapped);
+    const firstValidCategoryId =
+      categoryOptionsMapped.find((x) => x.defaultHabitId !== null)?.id ?? null;
+    setCreateCategoryId((previous) => previous ?? firstValidCategoryId);
 
     const targets = await getTargetsWithHabits();
     const gymTarget =
@@ -236,8 +292,11 @@ export default function HomeOverviewScreen() {
 
   const onStartHistoryEdit = (row: RecordHistoryRow) => {
     setEditingHistoryId(row.id);
+    setCreateStatus("");
     setEditingValue(String(row.value));
     setEditingNotes(row.notes ?? "");
+    setEditingDate(row.date);
+    setEditingCategoryId(row.categoryId);
     setHistoryStatus("");
   };
 
@@ -245,6 +304,8 @@ export default function HomeOverviewScreen() {
     setEditingHistoryId(null);
     setEditingValue("");
     setEditingNotes("");
+    setEditingDate("");
+    setEditingCategoryId(null);
   };
 
   const onSaveHistoryEdit = async (logId: number) => {
@@ -253,9 +314,50 @@ export default function HomeOverviewScreen() {
       setHistoryStatus("Enter a numeric value before saving.");
       return;
     }
-    await updateLog(logId, parsed, editingNotes);
+    if (!isValidDayMonthYear(editingDate)) {
+      setHistoryStatus("Use date format d/m/yyyy.");
+      return;
+    }
+    const selected = categoryOptions.find((x) => x.id === editingCategoryId);
+    if (!selected?.defaultHabitId) {
+      setHistoryStatus("Pick a valid category.");
+      return;
+    }
+    await updateRecord(logId, {
+      value: parsed,
+      notes: editingNotes,
+      date: editingDate,
+      habitId: selected.defaultHabitId,
+    });
     onCancelHistoryEdit();
     setHistoryStatus("Record updated.");
+    await loadDashboard();
+  };
+
+  const onCreateRecord = async () => {
+    const parsed = Number(createValue);
+    if (Number.isNaN(parsed)) {
+      setCreateStatus("Enter a numeric metric value.");
+      return;
+    }
+    if (!isValidDayMonthYear(createDate)) {
+      setCreateStatus("Use date format d/m/yyyy.");
+      return;
+    }
+    const selected = categoryOptions.find((x) => x.id === createCategoryId);
+    if (!selected?.defaultHabitId) {
+      setCreateStatus("Pick a category with a habit.");
+      return;
+    }
+    await insertRecord({
+      habitId: selected.defaultHabitId,
+      date: createDate,
+      value: parsed,
+      notes: createNotes,
+    });
+    setCreateValue("");
+    setCreateNotes("");
+    setCreateStatus("Record added.");
     await loadDashboard();
   };
 
@@ -346,6 +448,64 @@ export default function HomeOverviewScreen() {
         </View>
 
         <View style={styles.card}>
+          <Text style={styles.cardTitle}>Record CRUD</Text>
+          <Text style={styles.secondaryText}>Date (d/m/yyyy)</Text>
+          <TextInput
+            style={styles.input}
+            value={createDate}
+            onChangeText={setCreateDate}
+            placeholder="e.g. 21/4/2026"
+            placeholderTextColor={theme.colors.textSecondary}
+          />
+          <Text style={styles.secondaryText}>Category (required)</Text>
+          <View style={styles.filterChips}>
+            {categoryOptions.map((category) => {
+              const isActive = createCategoryId === category.id;
+              return (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[
+                    styles.filterChip,
+                    { borderColor: category.color },
+                    isActive && { backgroundColor: category.color },
+                  ]}
+                  onPress={() => setCreateCategoryId(category.id)}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      isActive && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {category.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <TextInput
+            style={styles.input}
+            value={createValue}
+            onChangeText={setCreateValue}
+            placeholder="Primary metric value"
+            placeholderTextColor={theme.colors.textSecondary}
+            keyboardType="numeric"
+          />
+          <TextInput
+            style={[styles.input, styles.editNotesInput]}
+            value={createNotes}
+            onChangeText={setCreateNotes}
+            placeholder="Notes (optional)"
+            placeholderTextColor={theme.colors.textSecondary}
+            multiline
+          />
+          <TouchableOpacity style={styles.editBtn} onPress={onCreateRecord}>
+            <Text style={styles.editBtnText}>Add Record</Text>
+          </TouchableOpacity>
+          {!!createStatus && <Text style={styles.secondaryText}>{createStatus}</Text>}
+        </View>
+
+        <View style={styles.card}>
           <Text style={styles.cardTitle}>History Tracker</Text>
           <Text style={styles.secondaryText}>Date Range (d/m/yyyy)</Text>
           <TextInput
@@ -427,6 +587,38 @@ export default function HomeOverviewScreen() {
                   </Text>
                   {editingHistoryId === row.id ? (
                     <>
+                      <TextInput
+                        style={styles.input}
+                        value={editingDate}
+                        onChangeText={setEditingDate}
+                        placeholder="Date (d/m/yyyy)"
+                        placeholderTextColor={theme.colors.textSecondary}
+                      />
+                      <View style={styles.filterChips}>
+                        {categoryOptions.map((category) => {
+                          const isActive = editingCategoryId === category.id;
+                          return (
+                            <TouchableOpacity
+                              key={`${row.id}-${category.id}`}
+                              style={[
+                                styles.filterChip,
+                                { borderColor: category.color },
+                                isActive && { backgroundColor: category.color },
+                              ]}
+                              onPress={() => setEditingCategoryId(category.id)}
+                            >
+                              <Text
+                                style={[
+                                  styles.filterChipText,
+                                  isActive && styles.filterChipTextActive,
+                                ]}
+                              >
+                                {category.name}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
                       <TextInput
                         style={styles.input}
                         value={editingValue}
