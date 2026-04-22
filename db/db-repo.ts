@@ -1,4 +1,6 @@
 import { asc, desc, eq, inArray } from "drizzle-orm";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import { db } from "./client";
 import { categories, habitLogs, habits, targets } from "./schema";
 
@@ -327,4 +329,56 @@ export async function getRecordHistory(): Promise<RecordHistoryRow[]> {
     .innerJoin(habits, eq(habitLogs.habitId, habits.id))
     .innerJoin(categories, eq(habits.categoryId, categories.id))
     .orderBy(desc(habitLogs.id));
+}
+
+function csvEscape(value: unknown): string {
+  const s = String(value ?? "");
+  if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+export async function exportDataToCSV() {
+  const rows = await db
+    .select({
+      date: habitLogs.date,
+      category: categories.name,
+      habit: habits.name,
+      value: habitLogs.value,
+      notes: habitLogs.notes,
+    })
+    .from(habitLogs)
+    .innerJoin(habits, eq(habitLogs.habitId, habits.id))
+    .innerJoin(categories, eq(habits.categoryId, categories.id))
+    .orderBy(desc(habitLogs.id));
+
+  const header = "Date,Category,Habit,Value,Notes";
+  const body = rows.map((r) =>
+    [
+      csvEscape(r.date),
+      csvEscape(r.category),
+      csvEscape(r.habit),
+      csvEscape(r.value),
+      csvEscape(r.notes ?? ""),
+    ].join(","),
+  );
+
+  const csvString = [header, ...body].join("\n");
+  const fileUri = `${FileSystem.documentDirectory}chicago_logs.csv`;
+
+  await FileSystem.writeAsStringAsync(fileUri, csvString, {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
+
+  const canShare = await Sharing.isAvailableAsync();
+  if (canShare) {
+    await Sharing.shareAsync(fileUri, {
+      mimeType: "text/csv",
+      dialogTitle: "Export Logs to CSV",
+      UTI: "public.comma-separated-values-text",
+    });
+  }
+
+  return { rowCount: rows.length, fileUri, shared: canShare };
 }

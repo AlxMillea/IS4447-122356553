@@ -7,7 +7,7 @@ import {
   getTargetsWithHabits,
   parseDayMonthYear,
 } from "../db/db-repo";
-import { theme } from "../theme/theme";
+import { useAppTheme } from "../state/theme-provider";
 
 const GREEN = "#22C55E";
 const RED = "#EF4444";
@@ -25,6 +25,8 @@ function startOfDay(value: Date): Date {
 }
 
 export default function TargetsScreen() {
+  const { theme } = useAppTheme();
+  const styles = createStyles(theme);
   const [rows, setRows] = useState<TargetRow[]>([]);
   const [logs, setLogs] = useState<LogRow[]>([]);
 
@@ -137,7 +139,7 @@ export default function TargetsScreen() {
     const exceededBad = mode === "max" && done > target;
     const unmet = mode === "min" && done < target;
     const barColor =
-      exceededBad || unmet ? RED : done > target ? GREEN : theme.colors.accent;
+      exceededBad || unmet ? RED : done > target ? GREEN : theme.accent;
 
     return (
       <View style={styles.card}>
@@ -260,29 +262,30 @@ export default function TargetsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background, padding: 16 },
-  title: {
-    color: theme.colors.textPrimary,
-    fontSize: 18,
-    marginBottom: 10,
-    marginTop: 8,
-    fontWeight: "700",
-  },
-  card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 10,
-  },
-  primary: { color: theme.colors.textPrimary, marginBottom: 8 },
-  secondary: { color: theme.colors.textSecondary, marginTop: 8 },
-  track: {
-    height: 10,
-    backgroundColor: "#E5E7EB",
-    borderRadius: 6,
-    overflow: "hidden",
-  },
-  fill: { height: 10, borderRadius: 6 },
-});
+const createStyles = (theme: any) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background, padding: 16 },
+    title: {
+      color: theme.textPrimary,
+      fontSize: 18,
+      marginBottom: 10,
+      marginTop: 8,
+      fontWeight: "700",
+    },
+    card: {
+      backgroundColor: theme.surface,
+      borderRadius: 8,
+      padding: 16,
+      marginBottom: 10,
+    },
+    primary: { color: theme.textPrimary, marginBottom: 8 },
+    secondary: { color: theme.textSecondary, marginTop: 8 },
+    track: {
+      height: 10,
+      backgroundColor: "#E5E7EB",
+      borderRadius: 6,
+      overflow: "hidden",
+    },
+    fill: { height: 10, borderRadius: 6 },
+  });
 

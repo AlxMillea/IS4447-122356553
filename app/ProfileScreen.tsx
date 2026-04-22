@@ -1,17 +1,20 @@
 import { User } from "lucide-react-native";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { theme } from "../theme/theme";
+import { useAppTheme } from "../state/theme-provider";
 
 type ProfileScreenProps = {
   onLogout: () => void;
 };
 
 export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
+  const { theme } = useAppTheme();
+  const styles = createStyles(theme);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.avatarContainer}>
         <View style={styles.avatarCircle}>
-          <User size={56} color={theme.colors.accent} />
+          <User size={56} color={theme.accent} />
         </View>
         <Text style={styles.name}>Alex Millea</Text>
         <Text style={styles.email}>122356553@umail.ucc.ie</Text>
@@ -19,21 +22,31 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>General Details</Text>
-        <Row label="Location" value="Cork, Ireland" />
-        <Row label="Chicago Trip" value="Summer 2025" />
-        <Row label="Goal" value="Marathon Prep" />
-        <Row label="Training Phase" value="Base Building" />
-        <Row label="Weekly Target" value="50 km" />
+        <Row styles={styles} label="Location" value="Cork, Ireland" />
+        <Row styles={styles} label="Chicago Trip" value="25 May 2026" />
+        <Row styles={styles} label="Goal" value="Body Recomposition" />
+        <Row styles={styles} label="Training" value="4-Day Split + Football" />
+        <Row styles={styles} label="Daily Protein" value="185 g" />
+        <Row styles={styles} label="Gym Days" value="2,800 kcal" />
+        <Row styles={styles} label="Rest Days" value="2,100 kcal" />
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
-        <Text style={styles.logoutText}>Logout</Text>
+        <Text style={styles.logoutButtonText}>Logout</Text>
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({
+  label,
+  value,
+  styles,
+}: {
+  label: string;
+  value: string;
+  styles: ReturnType<typeof createStyles>;
+}) {
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -42,58 +55,59 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  content: { padding: 20, paddingBottom: 40 },
-  avatarContainer: { alignItems: "center", marginBottom: 28 },
-  avatarCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 2,
-    borderColor: theme.colors.accent,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  name: {
-    color: theme.colors.textPrimary,
-    fontSize: 24,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-  email: { color: theme.colors.textSecondary, fontSize: 14 },
-  card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  cardTitle: {
-    color: theme.colors.accent,
-    fontWeight: "700",
-    fontSize: 16,
-    marginBottom: 12,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  rowLabel: { color: theme.colors.textSecondary, fontSize: 14 },
-  rowValue: { color: theme.colors.textPrimary, fontSize: 14, fontWeight: "600" },
-  logoutButton: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: theme.colors.accent,
-  },
-  logoutText: { color: theme.colors.accent, fontWeight: "700", fontSize: 16 },
-});
+const createStyles = (theme: any) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
+    content: { padding: 20, paddingBottom: 40 },
+    avatarContainer: { alignItems: "center", marginBottom: 28 },
+    avatarCircle: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      backgroundColor: theme.surface,
+      borderWidth: 2,
+      borderColor: theme.accent,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    name: {
+      color: theme.textPrimary,
+      fontSize: 24,
+      fontWeight: "800",
+      marginBottom: 4,
+    },
+    email: { color: theme.textSecondary, fontSize: 14 },
+    card: {
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 24,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    cardTitle: {
+      color: theme.accent,
+      fontWeight: "700",
+      fontSize: 16,
+      marginBottom: 12,
+    },
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    rowLabel: { color: theme.textSecondary, fontSize: 14 },
+    rowValue: { color: theme.textPrimary, fontSize: 14, fontWeight: "600" },
+    logoutButton: {
+      backgroundColor: theme.surface,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: theme.accent,
+    },
+    logoutButtonText: { color: theme.accent, fontWeight: "700", fontSize: 16 },
+  });

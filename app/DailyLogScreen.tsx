@@ -18,8 +18,8 @@ import {
   updateLog,
   type HabitLogRow,
 } from "../db/db-repo";
+import { useAppTheme } from "../state/theme-provider";
 import type { HomeStackParamList } from "./HomeLogsScreen";
-import { theme } from "../theme/theme";
 
 type DayType = "Gym" | "Football" | "Rest";
 const CHICAGO_TRIP_DATE = new Date("2026-05-25T00:00:00");
@@ -74,6 +74,8 @@ function parseDailyBundle(notes: string | null): {
 }
 
 export default function DailyLogScreen() {
+  const { theme } = useAppTheme();
+  const styles = createStyles(theme);
   const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const [dayType, setDayType] = useState<DayType>("Gym");
   const [caloriesIn, setCaloriesIn] = useState("");
@@ -313,7 +315,7 @@ export default function DailyLogScreen() {
           <TextInput
             style={styles.input}
             placeholder="Calories In"
-            placeholderTextColor={theme.colors.textSecondary}
+            placeholderTextColor={theme.textSecondary}
             keyboardType="numeric"
             value={caloriesIn}
             onChangeText={setCaloriesIn}
@@ -321,7 +323,7 @@ export default function DailyLogScreen() {
           <TextInput
             style={[styles.input, styles.prominentInput]}
             placeholder="Protein (g)"
-            placeholderTextColor={theme.colors.textSecondary}
+            placeholderTextColor={theme.textSecondary}
             keyboardType="numeric"
             value={proteinG}
             onChangeText={setProteinG}
@@ -333,7 +335,7 @@ export default function DailyLogScreen() {
           <TextInput
             style={styles.input}
             placeholder="Weight (kg)"
-            placeholderTextColor={theme.colors.textSecondary}
+            placeholderTextColor={theme.textSecondary}
             keyboardType="numeric"
             value={weightKg}
             onChangeText={setWeightKg}
@@ -370,7 +372,7 @@ export default function DailyLogScreen() {
           <TextInput
             style={styles.input}
             placeholder="Sleep Hours"
-            placeholderTextColor={theme.colors.textSecondary}
+            placeholderTextColor={theme.textSecondary}
             keyboardType="numeric"
             value={sleepHours}
             onChangeText={setSleepHours}
@@ -378,7 +380,7 @@ export default function DailyLogScreen() {
           <TextInput
             style={styles.input}
             placeholder="Whoop Recovery %"
-            placeholderTextColor={theme.colors.textSecondary}
+            placeholderTextColor={theme.textSecondary}
             keyboardType="numeric"
             value={whoopRecovery}
             onChangeText={setWhoopRecovery}
@@ -415,7 +417,7 @@ export default function DailyLogScreen() {
           <TextInput
             style={[styles.input, styles.notesInput]}
             placeholder="Daily journal notes..."
-            placeholderTextColor={theme.colors.textSecondary}
+            placeholderTextColor={theme.textSecondary}
             multiline
             value={dailyNotes}
             onChangeText={setDailyNotes}
@@ -431,87 +433,88 @@ export default function DailyLogScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.background },
-  container: {
-    padding: 16,
-    backgroundColor: theme.colors.background,
-    paddingBottom: 32,
-  },
-  countdown: {
-    color: theme.colors.accent,
-    fontSize: 56,
-    fontWeight: "900",
-    lineHeight: 60,
-  },
-  countdownLabel: {
-    color: theme.colors.accent,
-    fontSize: 22,
-    fontWeight: "800",
-    marginBottom: 12,
-  },
-  segmentRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
-  segmentRowWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  segment: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  segmentActive: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
-  },
-  segmentText: { color: theme.colors.textPrimary, fontWeight: "600" },
-  segmentTextActive: { color: "#FFFFFF" },
-  card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 12,
-    marginBottom: 16,
-    padding: 16,
-  },
-  cardTitle: {
-    color: theme.colors.textPrimary,
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 10,
-  },
-  input: {
-    backgroundColor: theme.colors.background,
-    color: theme.colors.textPrimary,
-    borderColor: theme.colors.border,
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 14,
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  prominentInput: {
-    borderColor: theme.colors.accent,
-    borderWidth: 2,
-  },
-  notesInput: { minHeight: 110, textAlignVertical: "top" },
-  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
-    backgroundColor: theme.colors.background,
-    borderColor: theme.colors.border,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  chipSelected: { backgroundColor: theme.colors.accent },
-  chipText: { color: theme.colors.textSecondary, fontWeight: "600" },
-  chipTextSelected: { color: "#FFFFFF" },
-  saveButton: {
-    width: "100%",
-    backgroundColor: theme.colors.accent,
-    borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  saveButtonText: { color: "#FFFFFF", fontWeight: "800", fontSize: 17 },
-  status: { color: theme.colors.textSecondary, marginTop: 10 },
-});
+const createStyles = (theme: any) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: theme.background },
+    container: {
+      padding: 16,
+      backgroundColor: theme.background,
+      paddingBottom: 32,
+    },
+    countdown: {
+      color: theme.accent,
+      fontSize: 56,
+      fontWeight: "900",
+      lineHeight: 60,
+    },
+    countdownLabel: {
+      color: theme.accent,
+      fontSize: 22,
+      fontWeight: "800",
+      marginBottom: 12,
+    },
+    segmentRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
+    segmentRowWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    segment: {
+      backgroundColor: theme.surface,
+      borderColor: theme.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+    },
+    segmentActive: {
+      backgroundColor: theme.accent,
+      borderColor: theme.accent,
+    },
+    segmentText: { color: theme.textPrimary, fontWeight: "600" },
+    segmentTextActive: { color: "#FFFFFF" },
+    card: {
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+      marginBottom: 16,
+      padding: 16,
+    },
+    cardTitle: {
+      color: theme.textPrimary,
+      fontSize: 18,
+      fontWeight: "700",
+      marginBottom: 10,
+    },
+    input: {
+      backgroundColor: theme.background,
+      color: theme.textPrimary,
+      borderColor: theme.border,
+      borderWidth: 1,
+      borderRadius: 10,
+      padding: 14,
+      fontSize: 16,
+      marginBottom: 10,
+    },
+    prominentInput: {
+      borderColor: theme.accent,
+      borderWidth: 2,
+    },
+    notesInput: { minHeight: 110, textAlignVertical: "top" },
+    chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    chip: {
+      backgroundColor: theme.background,
+      borderColor: theme.border,
+      borderWidth: 1,
+      borderRadius: 999,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+    },
+    chipSelected: { backgroundColor: theme.accent },
+    chipText: { color: theme.textSecondary, fontWeight: "600" },
+    chipTextSelected: { color: "#FFFFFF" },
+    saveButton: {
+      width: "100%",
+      backgroundColor: theme.accent,
+      borderRadius: 10,
+      paddingVertical: 16,
+      alignItems: "center",
+    },
+    saveButtonText: { color: "#FFFFFF", fontWeight: "800", fontSize: 17 },
+    status: { color: theme.textSecondary, marginTop: 10 },
+  });

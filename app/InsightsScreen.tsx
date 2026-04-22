@@ -7,7 +7,7 @@ import {
   getHabitsByNames,
   parseDayMonthYear,
 } from "../db/db-repo";
-import { theme } from "../theme/theme";
+import { useAppTheme } from "../state/theme-provider";
 
 const chartWidth = Dimensions.get("window").width - 32;
 const expectedCurve = [90, 89, 88, 87, 86];
@@ -37,6 +37,8 @@ function clamp(num: number, min: number, max: number): number {
 }
 
 export default function InsightsScreen() {
+  const { theme } = useAppTheme();
+  const styles = createStyles(theme);
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [habitMap, setHabitMap] = useState<Record<string, number>>({});
   const [timeView, setTimeView] = useState<TimeView>("weekly");
@@ -265,7 +267,7 @@ export default function InsightsScreen() {
             datasets: [
               {
                 data: chartData.actual.length ? chartData.actual : expectedCurve,
-                color: () => theme.colors.accent,
+                color: () => theme.accent,
                 strokeWidth: 2,
               },
               {
@@ -277,12 +279,12 @@ export default function InsightsScreen() {
             legend: ["Actual", "Expected"],
           }}
           chartConfig={{
-            backgroundColor: theme.colors.surface,
-            backgroundGradientFrom: theme.colors.surface,
-            backgroundGradientTo: theme.colors.surface,
+            backgroundColor: theme.surface,
+            backgroundGradientFrom: theme.surface,
+            backgroundGradientTo: theme.surface,
             decimalPlaces: 1,
-            color: () => theme.colors.textPrimary,
-            labelColor: () => theme.colors.textSecondary,
+            color: () => theme.textPrimary,
+            labelColor: () => theme.textSecondary,
             propsForDots: { r: "3" },
           }}
           bezier
@@ -298,32 +300,33 @@ export default function InsightsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background, padding: 16 },
-  header: { color: theme.colors.textPrimary, fontSize: 18, marginBottom: 10, fontWeight: "700" },
-  segmentRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
-  segment: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  segmentActive: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
-  },
-  segmentText: { color: theme.colors.textPrimary, fontWeight: "600" },
-  segmentTextActive: { color: "#FFFFFF" },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 10 },
-  card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 10,
-    flexGrow: 1,
-  },
-  primary: { color: theme.colors.textPrimary, fontSize: 16, marginTop: 4 },
-  secondary: { color: theme.colors.textSecondary },
-});
+const createStyles = (theme: any) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background, padding: 16 },
+    header: { color: theme.textPrimary, fontSize: 18, marginBottom: 10, fontWeight: "700" },
+    segmentRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+    segment: {
+      backgroundColor: theme.surface,
+      borderColor: theme.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+    },
+    segmentActive: {
+      backgroundColor: theme.accent,
+      borderColor: theme.accent,
+    },
+    segmentText: { color: theme.textPrimary, fontWeight: "600" },
+    segmentTextActive: { color: "#FFFFFF" },
+    grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 10 },
+    card: {
+      backgroundColor: theme.surface,
+      borderRadius: 8,
+      padding: 16,
+      marginBottom: 10,
+      flexGrow: 1,
+    },
+    primary: { color: theme.textPrimary, fontSize: 16, marginTop: 4 },
+    secondary: { color: theme.textSecondary },
+  });

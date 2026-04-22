@@ -1,26 +1,33 @@
 import { useEffect, useState } from "react";
 import {
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    CATEGORY_COLOR_OPTIONS,
-    normalizeCategoryColor,
+  CATEGORY_COLOR_OPTIONS,
+  normalizeCategoryColor,
 } from "../constants/category-colors";
 import {
-    deleteCategory,
-    getCategories,
-    insertCategory,
-    updateCategory,
+  deleteCategory,
+  getCategories,
+  insertCategory,
+  updateCategory,
 } from "../db/db-repo";
-import { theme } from "../theme/theme";
+import { useAppTheme } from "../state/theme-provider";
 
 type CategoryRow = { id: number; name: string; color: string; icon: string };
 
-export default function CategoriesScreen() {
+type CategoriesScreenProps = { embedded?: boolean };
+
+export default function CategoriesScreen({
+  embedded = false,
+}: CategoriesScreenProps) {
+  const { theme } = useAppTheme();
+  const styles = createStyles(theme);
+
   const [rows, setRows] = useState<CategoryRow[]>([]);
   const [name, setName] = useState("");
   const [color, setColor] = useState<string>(CATEGORY_COLOR_OPTIONS[0]);
@@ -51,7 +58,7 @@ export default function CategoriesScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={embedded ? undefined : styles.container}>
       <View style={styles.card}>
         <Text style={styles.label}>Category Name</Text>
         <TextInput
@@ -59,7 +66,7 @@ export default function CategoriesScreen() {
           value={name}
           onChangeText={setName}
           placeholder="e.g. Train"
-          placeholderTextColor={theme.colors.textSecondary}
+          placeholderTextColor={theme.textSecondary}
         />
         <Text style={styles.label}>Color</Text>
         <View style={styles.colorRow}>
@@ -114,63 +121,64 @@ export default function CategoriesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { padding: 16, backgroundColor: theme.colors.background },
-  card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
-  },
-  label: {
-    color: theme.colors.textPrimary,
-    marginBottom: 6,
-    fontWeight: "600",
-  },
-  input: {
-    backgroundColor: theme.colors.background,
-    color: theme.colors.textPrimary,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-  },
-  colorRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
-  colorChip: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  colorChipActive: { borderColor: theme.colors.textPrimary },
-  button: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: 8,
-    padding: 10,
-    alignItems: "center",
-  },
-  buttonText: { color: "#FFFFFF", fontWeight: "700" },
-  row: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  name: { color: theme.colors.textPrimary, fontWeight: "700" },
-  meta: { color: theme.colors.textSecondary },
-  dot: { width: 14, height: 14, borderRadius: 7 },
-  smallBtn: {
-    backgroundColor: "#E2E8F0",
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  smallBtnText: { color: theme.colors.textPrimary, fontWeight: "700" },
-  deleteBtn: { backgroundColor: "#FEE2E2" },
-  deleteText: { color: "#B91C1C", fontWeight: "700" },
-});
+const createStyles = (theme: any) =>
+  StyleSheet.create({
+    container: { padding: 16, backgroundColor: theme.background },
+    card: {
+      backgroundColor: theme.surface,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 12,
+    },
+    label: {
+      color: theme.textPrimary,
+      marginBottom: 6,
+      fontWeight: "600",
+    },
+    input: {
+      backgroundColor: theme.background,
+      color: theme.textPrimary,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 8,
+      padding: 10,
+      marginBottom: 10,
+    },
+    colorRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
+    colorChip: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      borderWidth: 2,
+      borderColor: "transparent",
+    },
+    colorChipActive: { borderColor: theme.textPrimary },
+    button: {
+      backgroundColor: theme.accent,
+      borderRadius: 8,
+      padding: 10,
+      alignItems: "center",
+    },
+    buttonText: { color: "#FFFFFF", fontWeight: "700" },
+    row: {
+      backgroundColor: theme.surface,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    name: { color: theme.textPrimary, fontWeight: "700" },
+    meta: { color: theme.textSecondary },
+    dot: { width: 14, height: 14, borderRadius: 7 },
+    smallBtn: {
+      backgroundColor: "#E2E8F0",
+      borderRadius: 8,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+    },
+    smallBtnText: { color: "#1A1A1A", fontWeight: "700" },
+    deleteBtn: { backgroundColor: "#FEE2E2" },
+    deleteText: { color: "#B91C1C", fontWeight: "700" },
+  });

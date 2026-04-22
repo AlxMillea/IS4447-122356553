@@ -1,5 +1,6 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import * as Haptics from "expo-haptics";
 import { useCallback, useMemo, useState } from "react";
 import {
   ScrollView,
@@ -10,823 +11,475 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { normalizeCategoryColor } from "../constants/category-colors";
 import {
-  deleteLog,
   formatDayMonthYear,
-  getCategoriesWithHabits,
   getHabitLogsByHabitIds,
   getHabitsByNames,
-  getRecordHistory,
   getTargetsWithHabits,
-  insertRecord,
-  parseDayMonthYear,
-  updateRecord,
-  type CategoryWithHabits,
-  type RecordHistoryRow,
+  insertLogAtDate,
+  updateLog,
+  type HabitLogRow,
 } from "../db/db-repo";
-import { theme } from "../theme/theme";
+import { useAppTheme } from "../state/theme-provider";
 import type { HomeStackParamList } from "./HomeLogsScreen";
+import MorningPulseModal from "./MorningPulseModal";
 
 const CHICAGO_TRIP_DATE = new Date("2026-05-25T00:00:00");
+const PHASE_START = new Date("2026-04-21T00:00:00");
+const PROTEIN_TARGET = 185;
+const WATER_TARGET = 3500;
 
-type TodayMetric = {
-  name: string;
-  value: number;
-};
+const SUPPLEMENTS = [
+  "Creatine 10g",
+  "Whey",
+  "L-Citrulline",
+  "Sona Electrolytes",
+  "PHN Z",
+  "Sona Zinc",
+  "Sona Garlic",
+  "Beta Carotene",
+] as const;
 
-type CategoryOption = {
-  id: number;
-  name: string;
-  color: string;
-  icon: string;
-  defaultHabitId: number | null;
-};
-
-function isValidDayMonthYear(value: string): boolean {
-  const [dStr, mStr, yStr] = value.split("/");
-  const d = Number(dStr);
-  const m = Number(mStr);
-  const y = Number(yStr);
-  if (
-    !Number.isInteger(d) ||
-    !Number.isInteger(m) ||
-    !Number.isInteger(y) ||
-    y < 2000 ||
-    m < 1 ||
-    m > 12 ||
-    d < 1 ||
-    d > 31
-  ) {
-    return false;
-  }
-  const date = new Date(y, m - 1, d);
-  return (
-    date.getFullYear() === y &&
-    date.getMonth() === m - 1 &&
-    date.getDate() === d
-  );
-}
+type DayType = "Gym" | "Football" | "Rest";
 
 export default function HomeOverviewScreen() {
-  const now = new Date();
-  const initialTo = formatDayMonthYear(now);
-  const initialFromDate = new Date(now);
-  initialFromDate.setDate(now.getDate() - 7);
-  const initialFrom = formatDayMonthYear(initialFromDate);
+  const { theme } = useAppTheme();
+  const styles = createStyles(theme);
+  const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
 
-  const navigation =
-    useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
-  const [loading, setLoading] = useState(true);
+  const [showMorningPulse, setShowMorningPulse] = useState(false);
   const [todayDate, setTodayDate] = useState("");
-  const [todayMetrics, setTodayMetrics] = useState<TodayMetric[]>([]);
-  const [todayByName, setTodayByName] = useState<Record<string, number>>({});
-  const [historyRows, setHistoryRows] = useState<RecordHistoryRow[]>([]);
-  const [filterFromDate, setFilterFromDate] = useState(initialFrom);
-  const [filterToDate, setFilterToDate] = useState(initialTo);
-  const [filterCategory, setFilterCategory] = useState("All");
-  const [filterText, setFilterText] = useState("");
-  const [editingHistoryId, setEditingHistoryId] = useState<number | null>(null);
-  const [editingValue, setEditingValue] = useState("");
-  const [editingNotes, setEditingNotes] = useState("");
-  const [editingDate, setEditingDate] = useState("");
-  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
-  const [historyStatus, setHistoryStatus] = useState("");
-  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
-  const [createDate, setCreateDate] = useState(initialTo);
-  const [createCategoryId, setCreateCategoryId] = useState<number | null>(null);
-  const [createValue, setCreateValue] = useState("");
-  const [createNotes, setCreateNotes] = useState("");
-  const [createStatus, setCreateStatus] = useState("");
+  const [dayType, setDayType] = useState<DayType>("Gym");
+  const [proteinG, setProteinG] = useState(0);
+  const [waterMl, setWaterMl] = useState(0);
+  const [selectedSupplements, setSelectedSupplements] = useState<string[]>([]);
+  const [customProteinInput, setCustomProteinInput] = useState("");
+  const [customWaterInput, setCustomWaterInput] = useState("");
+  const [showCustomProtein, setShowCustomProtein] = useState(false);
+  const [showCustomWater, setShowCustomWater] = useState(false);
   const [globalTargets, setGlobalTargets] = useState({
-    gymDone: 0,
-    gymTarget: 20,
-    footballDone: 0,
-    footballTarget: 5,
-    proteinDone: 0,
-    proteinTarget: 35,
+    gymDone: 0, gymTarget: 20,
+    footballDone: 0, footballTarget: 5,
+    proteinDone: 0, proteinTarget: 35,
   });
+
+  // Store habitIds and existing logs for upserts
+  const [habitIds, setHabitIds] = useState<Record<string, number>>({});
+  const [existingByHabitId, setExistingByHabitId] = useState<Map<number, HabitLogRow>>(new Map());
 
   const daysUntilChicago = useMemo(() => {
     const diffMs = CHICAGO_TRIP_DATE.getTime() - new Date().getTime();
     return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
   }, []);
 
+  const phasePct = useMemo(() => {
+    const total = CHICAGO_TRIP_DATE.getTime() - PHASE_START.getTime();
+    const elapsed = new Date().getTime() - PHASE_START.getTime();
+    return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
+  }, []);
+
+  const caloriesTarget = dayType === "Rest" ? 2100 : 2800;
+
   const loadDashboard = useCallback(async () => {
-    setLoading(true);
     const date = formatDayMonthYear(new Date());
     setTodayDate(date);
 
-    const habits = await getHabitsByNames([
-      "Calories (Gym Day)",
-      "Calories (Rest Day)",
-      "Hit 185g Protein",
-      "Weigh-in",
-      "Gym Session",
-      "Football Session",
-      "Log Sleep",
-      "Whoop Recovery %",
-      "Water Intake (ml)",
-    ]);
+    const habitNames = [
+      "Calories (Gym Day)", "Calories (Rest Day)", "Hit 185g Protein",
+      "Weigh-in", "Gym Session", "Football Session", "Log Sleep",
+      "Whoop Recovery %", "Water Intake (ml)",
+    ];
+    const habits = await getHabitsByNames(habitNames);
+    const ids = Object.fromEntries(habits.map((h) => [h.name, h.id])) as Record<string, number>;
+    setHabitIds(ids);
 
-    const idByName = Object.fromEntries(
-      habits.map((h) => [h.name, h.id]),
-    ) as Record<string, number>;
-    const nameById = Object.fromEntries(
-      habits.map((h) => [h.id, h.name]),
-    ) as Record<number, string>;
+    const allLogs = await getHabitLogsByHabitIds(habits.map((h) => h.id));
+    const todayLogs = allLogs.filter((l) => l.date === date);
+    const byHabitId = new Map(todayLogs.map((l) => [l.habitId, l]));
+    setExistingByHabitId(byHabitId);
 
-    const logs = await getHabitLogsByHabitIds(habits.map((h) => h.id));
-    const history = await getRecordHistory();
-    const categoryHabitRows = (await getCategoriesWithHabits()) as CategoryWithHabits[];
-    const todayLogs = logs.filter((l) => l.date === date);
+    // Check morning pulse: show if no weight and no sleep logged today
+    const hasWeight = byHabitId.has(ids["Weigh-in"]);
+    const hasSleep = byHabitId.has(ids["Log Sleep"]);
+    if (!hasWeight && !hasSleep) setShowMorningPulse(true);
 
-    const todayMap: Record<string, number> = {};
-    const todayRows: TodayMetric[] = [];
-    for (const row of todayLogs) {
-      const habitName = nameById[row.habitId];
-      if (!habitName) continue;
-      todayMap[habitName] = row.value;
-      todayRows.push({ name: habitName, value: row.value });
+    // Protein & water
+    setProteinG(byHabitId.get(ids["Hit 185g Protein"])?.value ?? 0);
+    setWaterMl(byHabitId.get(ids["Water Intake (ml)"])?.value ?? 0);
+
+    // Day type from existing log notes
+    const gymCalLog = byHabitId.get(ids["Calories (Gym Day)"]);
+    const restCalLog = byHabitId.get(ids["Calories (Rest Day)"]);
+    const footballLog = byHabitId.get(ids["Football Session"]);
+    if (footballLog?.value && footballLog.value >= 1) setDayType("Football");
+    else if (restCalLog) setDayType("Rest");
+    else setDayType("Gym");
+
+    // Parse supplement state from existing calories log notes
+    const calLog = gymCalLog ?? restCalLog;
+    if (calLog?.notes) {
+      const match = calLog.notes.match(/Supplements:([^|]+)/);
+      const supp = match?.[1]?.split(",").map((x) => x.trim()).filter((x) => x && x !== "None") ?? [];
+      setSelectedSupplements(supp);
+    } else {
+      setSelectedSupplements([]);
     }
-    setTodayByName(todayMap);
-    setTodayMetrics(todayRows);
-    setHistoryRows(history);
-    const categoryOptionsMapped: CategoryOption[] = categoryHabitRows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      color: normalizeCategoryColor(row.color),
-      icon: row.icon,
-      defaultHabitId: row.habits[0]?.id ?? null,
-    }));
-    setCategoryOptions(categoryOptionsMapped);
-    const firstValidCategoryId =
-      categoryOptionsMapped.find((x) => x.defaultHabitId !== null)?.id ?? null;
-    setCreateCategoryId((previous) => previous ?? firstValidCategoryId);
 
+    // Global targets
     const targets = await getTargetsWithHabits();
-    const gymTarget =
-      targets.find(
-        (t) => t.habitName === "Gym Session" && t.period === "global_5w",
-      )?.targetValue ?? 20;
-    const footballTarget =
-      targets.find(
-        (t) => t.habitName === "Football Session" && t.period === "global_5w",
-      )?.targetValue ?? 5;
-    const proteinTarget =
-      targets.find(
-        (t) => t.habitName === "Hit 185g Protein" && t.period === "global_5w",
-      )?.targetValue ?? 35;
-
-    const gymDone = logs.filter(
-      (l) => l.habitId === idByName["Gym Session"] && l.value >= 1,
-    ).length;
-    const footballDone = logs.filter(
-      (l) => l.habitId === idByName["Football Session"] && l.value >= 1,
-    ).length;
-    const proteinDone = new Set(
-      logs
-        .filter(
-          (l) => l.habitId === idByName["Hit 185g Protein"] && l.value >= 185,
-        )
-        .map((l) => l.date),
-    ).size;
-
-    setGlobalTargets({
-      gymDone,
-      gymTarget,
-      footballDone,
-      footballTarget,
-      proteinDone,
-      proteinTarget,
-    });
-    setLoading(false);
+    const gymTarget = targets.find((t) => t.habitName === "Gym Session" && t.period === "global_5w")?.targetValue ?? 20;
+    const footballTarget = targets.find((t) => t.habitName === "Football Session" && t.period === "global_5w")?.targetValue ?? 5;
+    const proteinTarget = targets.find((t) => t.habitName === "Hit 185g Protein" && t.period === "global_5w")?.targetValue ?? 35;
+    const gymDone = allLogs.filter((l) => l.habitId === ids["Gym Session"] && l.value >= 1).length;
+    const footballDone = allLogs.filter((l) => l.habitId === ids["Football Session"] && l.value >= 1).length;
+    const proteinDone = new Set(allLogs.filter((l) => l.habitId === ids["Hit 185g Protein"] && l.value >= 185).map((l) => l.date)).size;
+    setGlobalTargets({ gymDone, gymTarget, footballDone, footballTarget, proteinDone, proteinTarget });
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      void loadDashboard();
-    }, [loadDashboard]),
-  );
+  useFocusEffect(useCallback(() => { void loadDashboard(); }, [loadDashboard]));
 
-  const proteinValue = todayByName["Hit 185g Protein"] ?? 0;
-  const waterValue = todayByName["Water Intake (ml)"] ?? 0;
-  const gymCalories = todayByName["Calories (Gym Day)"];
-  const restCalories = todayByName["Calories (Rest Day)"];
-  const caloriesValue = gymCalories ?? restCalories ?? 0;
-  const caloriesTarget = gymCalories !== undefined ? 2800 : 2100;
-  const trainingDone =
-    (todayByName["Gym Session"] ?? 0) >= 1 ||
-    (todayByName["Football Session"] ?? 0) >= 1;
-
-  const historyCategories = useMemo(() => {
-    return [
-      "All",
-      ...Array.from(new Set(historyRows.map((x) => x.categoryName))).sort(),
-    ];
-  }, [historyRows]);
-
-  const historyCategoryColorByName = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const row of historyRows) {
-      map[row.categoryName] = normalizeCategoryColor(row.categoryColor);
-    }
-    return map;
-  }, [historyRows]);
-
-  const filteredHistory = useMemo(() => {
-    let rows = [...historyRows];
-
-    if (filterCategory !== "All") {
-      rows = rows.filter((x) => x.categoryName === filterCategory);
-    }
-
-    const text = filterText.trim().toLowerCase();
-    if (text) {
-      rows = rows.filter((x) =>
-        `${x.habitName} ${x.categoryName} ${x.notes ?? ""}`
-          .toLowerCase()
-          .includes(text),
-      );
-    }
-
-    const fromParts = filterFromDate.split("/").map(Number);
-    const toParts = filterToDate.split("/").map(Number);
-    const hasValidFrom =
-      fromParts.length === 3 && fromParts.every((v) => !Number.isNaN(v));
-    const hasValidTo =
-      toParts.length === 3 && toParts.every((v) => !Number.isNaN(v));
-    const from = hasValidFrom ? parseDayMonthYear(filterFromDate) : null;
-    const to = hasValidTo ? parseDayMonthYear(filterToDate) : null;
-
-    if (from || to) {
-      rows = rows.filter((x) => {
-        const d = parseDayMonthYear(x.date);
-        if (from && d < from) return false;
-        if (to && d > to) return false;
-        return true;
+  // Generic upsert helper
+  const upsert = useCallback(async (habitName: string, value: number, notes?: string) => {
+    const habitId = habitIds[habitName];
+    if (!habitId) return;
+    const existing = existingByHabitId.get(habitId);
+    const date = formatDayMonthYear(new Date());
+    if (existing) {
+      await updateLog(existing.id, value, notes ?? existing.notes ?? undefined);
+      setExistingByHabitId((prev) => {
+        const next = new Map(prev);
+        next.set(habitId, { ...existing, value });
+        return next;
       });
+    } else {
+      await insertLogAtDate(habitId, date, value, notes);
+      // Reload to capture new log ID
+      void loadDashboard();
     }
+  }, [habitIds, existingByHabitId, loadDashboard]);
 
-    rows.sort((a, b) => {
-      const byDate =
-        parseDayMonthYear(b.date).getTime() -
-        parseDayMonthYear(a.date).getTime();
-      if (byDate !== 0) return byDate;
-      return b.id - a.id;
+  const onAddProtein = async (amount: number) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const newVal = proteinG + amount;
+    setProteinG(newVal);
+    void upsert("Hit 185g Protein", newVal);
+    if (newVal >= PROTEIN_TARGET && proteinG < PROTEIN_TARGET) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  };
+
+  const onAddWater = async (amount: number) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const newVal = waterMl + amount;
+    setWaterMl(newVal);
+    void upsert("Water Intake (ml)", newVal);
+    if (newVal >= WATER_TARGET && waterMl < WATER_TARGET) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  };
+
+  const onCustomProtein = async () => {
+    const val = Number(customProteinInput);
+    if (!Number.isNaN(val) && val > 0) {
+      await onAddProtein(val);
+      setCustomProteinInput("");
+      setShowCustomProtein(false);
+    }
+  };
+
+  const onCustomWater = async () => {
+    const val = Number(customWaterInput);
+    if (!Number.isNaN(val) && val > 0) {
+      await onAddWater(val);
+      setCustomWaterInput("");
+      setShowCustomWater(false);
+    }
+  };
+
+  const onToggleSupplement = async (supp: string) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedSupplements((prev) => {
+      const next = prev.includes(supp) ? prev.filter((x) => x !== supp) : [...prev, supp];
+      // Persist to existing calories log notes in background
+      const gymHabitId = habitIds["Calories (Gym Day)"];
+      const restHabitId = habitIds["Calories (Rest Day)"];
+      const calLog = existingByHabitId.get(gymHabitId) ?? existingByHabitId.get(restHabitId);
+      if (calLog) {
+        const suppStr = next.length ? next.join(", ") : "None";
+        let notes = calLog.notes ?? "";
+        if (notes.includes("Supplements:")) {
+          notes = notes.replace(/Supplements:[^|]+/, `Supplements:${suppStr}`);
+        } else {
+          notes = notes ? `${notes} | Supplements:${suppStr}` : `Supplements:${suppStr}`;
+        }
+        void updateLog(calLog.id, calLog.value, notes);
+      }
+      return next;
     });
-
-    return rows;
-  }, [historyRows, filterCategory, filterFromDate, filterToDate, filterText]);
-
-  const onDeleteHistoryRow = async (logId: number) => {
-    if (editingHistoryId === logId) {
-      setEditingHistoryId(null);
-      setEditingValue("");
-      setEditingNotes("");
-    }
-    await deleteLog(logId);
-    setHistoryStatus("Record deleted.");
-    await loadDashboard();
   };
 
-  const onStartHistoryEdit = (row: RecordHistoryRow) => {
-    setEditingHistoryId(row.id);
-    setCreateStatus("");
-    setEditingValue(String(row.value));
-    setEditingNotes(row.notes ?? "");
-    setEditingDate(row.date);
-    setEditingCategoryId(row.categoryId);
-    setHistoryStatus("");
-  };
-
-  const onCancelHistoryEdit = () => {
-    setEditingHistoryId(null);
-    setEditingValue("");
-    setEditingNotes("");
-    setEditingDate("");
-    setEditingCategoryId(null);
-  };
-
-  const onSaveHistoryEdit = async (logId: number) => {
-    const parsed = Number(editingValue);
-    if (Number.isNaN(parsed)) {
-      setHistoryStatus("Enter a numeric value before saving.");
-      return;
-    }
-    if (!isValidDayMonthYear(editingDate)) {
-      setHistoryStatus("Use date format d/m/yyyy.");
-      return;
-    }
-    const selected = categoryOptions.find((x) => x.id === editingCategoryId);
-    if (!selected?.defaultHabitId) {
-      setHistoryStatus("Pick a valid category.");
-      return;
-    }
-    await updateRecord(logId, {
-      value: parsed,
-      notes: editingNotes,
-      date: editingDate,
-      habitId: selected.defaultHabitId,
-    });
-    onCancelHistoryEdit();
-    setHistoryStatus("Record updated.");
-    await loadDashboard();
-  };
-
-  const onCreateRecord = async () => {
-    const parsed = Number(createValue);
-    if (Number.isNaN(parsed)) {
-      setCreateStatus("Enter a numeric metric value.");
-      return;
-    }
-    if (!isValidDayMonthYear(createDate)) {
-      setCreateStatus("Use date format d/m/yyyy.");
-      return;
-    }
-    const selected = categoryOptions.find((x) => x.id === createCategoryId);
-    if (!selected?.defaultHabitId) {
-      setCreateStatus("Pick a category with a habit.");
-      return;
-    }
-    await insertRecord({
-      habitId: selected.defaultHabitId,
-      date: createDate,
-      value: parsed,
-      notes: createNotes,
-    });
-    setCreateValue("");
-    setCreateNotes("");
-    setCreateStatus("Record added.");
-    await loadDashboard();
-  };
-
-  const openCategories = () => {
-    navigation.getParent()?.navigate("Settings" as never);
-  };
+  const proteinPct = Math.min(100, (proteinG / PROTEIN_TARGET) * 100);
+  const waterPct = Math.min(100, (waterMl / WATER_TARGET) * 100);
 
   return (
     <SafeAreaView style={styles.safe}>
+      <MorningPulseModal
+        visible={showMorningPulse}
+        onClose={() => { setShowMorningPulse(false); void loadDashboard(); }}
+      />
+
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>{daysUntilChicago}</Text>
-        <Text style={styles.subtitle}>Days to Chicago</Text>
-        <Text style={styles.secondaryText}>{`Today: ${todayDate || "-"}`}</Text>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>{`Today's Progress`}</Text>
-          <Text style={styles.rowText}>
-            {proteinValue >= 185 ? "OK" : "MISS"} Protein:{" "}
-            {Math.round(proteinValue)}g / 185g
-          </Text>
-          <Text style={styles.rowText}>
-            {waterValue >= 3500 ? "OK" : "MISS"} Water: {Math.round(waterValue)}
-            ml / 3500ml
-          </Text>
-          <Text style={styles.rowText}>
-            {caloriesValue > 0 && caloriesValue <= caloriesTarget
-              ? "OK"
-              : "MISS"}{" "}
-            Calories: {Math.round(caloriesValue)} / {caloriesTarget}
-          </Text>
-          <Text style={styles.rowText}>
-            {trainingDone ? "OK" : "MISS"} Training logged today
-          </Text>
+        {/* ── COUNTDOWN ── */}
+        <View style={styles.countdownSection}>
+          <Text style={styles.countdownNumber}>{daysUntilChicago}</Text>
+          <Text style={styles.countdownLabel}>Days to Chicago</Text>
+          <Text style={styles.countdownSub}>{todayDate}</Text>
+          <View style={styles.phaseTrack}>
+            <View style={[styles.phaseFill, { width: `${phasePct}%` }]} />
+          </View>
+          <Text style={styles.phaseLabel}>{phasePct}% through 5-week phase</Text>
         </View>
 
+        {/* ── DAY TYPE ── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Global Goals</Text>
-          <Text style={styles.rowText}>
-            Gym Sessions: {globalTargets.gymDone}/{globalTargets.gymTarget} (
-            {Math.max(globalTargets.gymTarget - globalTargets.gymDone, 0)} left)
-          </Text>
-          <Text style={styles.rowText}>
-            Football Sessions: {globalTargets.footballDone}/
-            {globalTargets.footballTarget} (
-            {Math.max(
-              globalTargets.footballTarget - globalTargets.footballDone,
-              0,
-            )}{" "}
-            left)
-          </Text>
-          <Text style={styles.rowText}>
-            Protein Days: {globalTargets.proteinDone}/
-            {globalTargets.proteinTarget} (
-            {Math.max(
-              globalTargets.proteinTarget - globalTargets.proteinDone,
-              0,
-            )}{" "}
-            left)
-          </Text>
+          <Text style={styles.cardTitle}>Day Type</Text>
+          <View style={styles.segRow}>
+            {(["Gym", "Football", "Rest"] as DayType[]).map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.seg, dayType === t && styles.segActive]}
+                onPress={async () => {
+                  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setDayType(t);
+                }}
+              >
+                <Text style={[styles.segText, dayType === t && styles.segTextActive]}>{t}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.calTarget}>Target: {caloriesTarget} kcal</Text>
         </View>
+
+        {/* ── PROTEIN STEPPER ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Protein</Text>
+            <Text style={[styles.stepperValue, proteinG >= PROTEIN_TARGET && styles.stepperValueDone]}>
+              {Math.round(proteinG)}g / {PROTEIN_TARGET}g
+            </Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${proteinPct}%` }, proteinG >= PROTEIN_TARGET && styles.progressFillDone]} />
+          </View>
+          <View style={styles.stepperRow}>
+            <TouchableOpacity style={styles.stepBtn} onPress={() => onAddProtein(25)}>
+              <Text style={styles.stepBtnText}>+25g</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.stepBtn} onPress={() => onAddProtein(40)}>
+              <Text style={styles.stepBtnText}>+40g</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.stepBtn, showCustomProtein && styles.stepBtnActive]}
+              onPress={() => setShowCustomProtein((v) => !v)}
+            >
+              <Text style={styles.stepBtnText}>Custom</Text>
+            </TouchableOpacity>
+          </View>
+          {showCustomProtein && (
+            <View style={styles.customRow}>
+              <TextInput
+                style={styles.customInput}
+                value={customProteinInput}
+                onChangeText={setCustomProteinInput}
+                placeholder="grams"
+                placeholderTextColor={theme.textSecondary}
+                keyboardType="numeric"
+              />
+              <TouchableOpacity style={styles.customAddBtn} onPress={onCustomProtein}>
+                <Text style={styles.customAddBtnText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* ── WATER STEPPER ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Water</Text>
+            <Text style={[styles.stepperValue, waterMl >= WATER_TARGET && styles.stepperValueDone]}>
+              {Math.round(waterMl)}ml / {WATER_TARGET}ml
+            </Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${waterPct}%` }, waterMl >= WATER_TARGET && styles.progressFillDone]} />
+          </View>
+          <View style={styles.stepperRow}>
+            <TouchableOpacity style={styles.stepBtn} onPress={() => onAddWater(250)}>
+              <Text style={styles.stepBtnText}>+250ml</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.stepBtn} onPress={() => onAddWater(500)}>
+              <Text style={styles.stepBtnText}>+500ml</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.stepBtn, showCustomWater && styles.stepBtnActive]}
+              onPress={() => setShowCustomWater((v) => !v)}
+            >
+              <Text style={styles.stepBtnText}>Custom</Text>
+            </TouchableOpacity>
+          </View>
+          {showCustomWater && (
+            <View style={styles.customRow}>
+              <TextInput
+                style={styles.customInput}
+                value={customWaterInput}
+                onChangeText={setCustomWaterInput}
+                placeholder="ml"
+                placeholderTextColor={theme.textSecondary}
+                keyboardType="numeric"
+              />
+              <TouchableOpacity style={styles.customAddBtn} onPress={onCustomWater}>
+                <Text style={styles.customAddBtnText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* ── SUPPLEMENTS ── */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Supplements</Text>
+          <View style={styles.suppGrid}>
+            {SUPPLEMENTS.map((supp) => {
+              const active = selectedSupplements.includes(supp);
+              return (
+                <TouchableOpacity
+                  key={supp}
+                  style={[styles.suppChip, active && styles.suppChipActive]}
+                  onPress={() => onToggleSupplement(supp)}
+                >
+                  <Text style={[styles.suppText, active && styles.suppTextActive]}>{supp}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* ── GLOBAL GOALS ── */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>5-Week Goals</Text>
+          <GoalRow
+            label="Gym Sessions"
+            done={globalTargets.gymDone}
+            target={globalTargets.gymTarget}
+            accentColor={theme.accent}
+            textSecondary={theme.textSecondary}
+            textPrimary={theme.textPrimary}
+          />
+          <GoalRow
+            label="Football Sessions"
+            done={globalTargets.footballDone}
+            target={globalTargets.footballTarget}
+            accentColor={theme.accent}
+            textSecondary={theme.textSecondary}
+            textPrimary={theme.textPrimary}
+          />
+          <GoalRow
+            label="Protein Days ≥185g"
+            done={globalTargets.proteinDone}
+            target={globalTargets.proteinTarget}
+            accentColor={theme.accent}
+            textSecondary={theme.textSecondary}
+            textPrimary={theme.textPrimary}
+          />
+        </View>
+
+        {/* ── CTA ── */}
+        <TouchableOpacity style={styles.logBtn} onPress={() => navigation.navigate("DailyLog")}>
+          <Text style={styles.logBtnText}>Log Today</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.logButton}
-          onPress={() => navigation.navigate("DailyLog")}
+          style={styles.morningPulseBtn}
+          onPress={() => setShowMorningPulse(true)}
         >
-          <Text style={styles.logButtonText}>Log Today</Text>
+          <Text style={styles.morningPulseBtnText}>Morning Pulse</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.manageButton} onPress={openCategories}>
-          <Text style={styles.manageButtonText}>Manage Categories</Text>
-        </TouchableOpacity>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Logged Today</Text>
-          {loading ? (
-            <Text style={styles.secondaryText}>Loading...</Text>
-          ) : todayMetrics.length === 0 ? (
-            <Text style={styles.secondaryText}>
-              No logs saved for today yet.
-            </Text>
-          ) : (
-            todayMetrics.map((item) => (
-              <Text key={`${item.name}-${item.value}`} style={styles.rowText}>
-                {item.name}: {item.value}
-              </Text>
-            ))
-          )}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Record CRUD</Text>
-          <Text style={styles.secondaryText}>Date (d/m/yyyy)</Text>
-          <TextInput
-            style={styles.input}
-            value={createDate}
-            onChangeText={setCreateDate}
-            placeholder="e.g. 21/4/2026"
-            placeholderTextColor={theme.colors.textSecondary}
-          />
-          <Text style={styles.secondaryText}>Category (required)</Text>
-          <View style={styles.filterChips}>
-            {categoryOptions.map((category) => {
-              const isActive = createCategoryId === category.id;
-              return (
-                <TouchableOpacity
-                  key={category.id}
-                  style={[
-                    styles.filterChip,
-                    { borderColor: category.color },
-                    isActive && { backgroundColor: category.color },
-                  ]}
-                  onPress={() => setCreateCategoryId(category.id)}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      isActive && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {category.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          <TextInput
-            style={styles.input}
-            value={createValue}
-            onChangeText={setCreateValue}
-            placeholder="Primary metric value"
-            placeholderTextColor={theme.colors.textSecondary}
-            keyboardType="numeric"
-          />
-          <TextInput
-            style={[styles.input, styles.editNotesInput]}
-            value={createNotes}
-            onChangeText={setCreateNotes}
-            placeholder="Notes (optional)"
-            placeholderTextColor={theme.colors.textSecondary}
-            multiline
-          />
-          <TouchableOpacity style={styles.editBtn} onPress={onCreateRecord}>
-            <Text style={styles.editBtnText}>Add Record</Text>
-          </TouchableOpacity>
-          {!!createStatus && <Text style={styles.secondaryText}>{createStatus}</Text>}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>History Tracker</Text>
-          <Text style={styles.secondaryText}>Date Range (d/m/yyyy)</Text>
-          <TextInput
-            style={styles.input}
-            value={filterFromDate}
-            onChangeText={setFilterFromDate}
-            placeholder="From date"
-            placeholderTextColor={theme.colors.textSecondary}
-          />
-          <TextInput
-            style={styles.input}
-            value={filterToDate}
-            onChangeText={setFilterToDate}
-            placeholder="To date"
-            placeholderTextColor={theme.colors.textSecondary}
-          />
-          <TextInput
-            style={styles.input}
-            value={filterText}
-            onChangeText={setFilterText}
-            placeholder="Search notes / habit / category"
-            placeholderTextColor={theme.colors.textSecondary}
-          />
-
-          <View style={styles.filterChips}>
-            {historyCategories.map((category) => {
-              const chipColor =
-                category === "All"
-                  ? theme.colors.border
-                  : (historyCategoryColorByName[category] ??
-                    theme.colors.accent);
-              const isActive = filterCategory === category;
-              return (
-                <TouchableOpacity
-                  key={category}
-                  style={[
-                    styles.filterChip,
-                    { borderColor: chipColor },
-                    isActive && { backgroundColor: chipColor },
-                  ]}
-                  onPress={() => setFilterCategory(category)}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      isActive && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {category}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {!!historyStatus && (
-            <Text style={styles.secondaryText}>{historyStatus}</Text>
-          )}
-
-          {filteredHistory.length === 0 ? (
-            <Text style={styles.secondaryText}>
-              No records match your filters.
-            </Text>
-          ) : (
-            filteredHistory.map((row) => (
-              <View key={row.id} style={styles.historyRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowText}>
-                    {row.date} |{" "}
-                    <Text
-                      style={[
-                        styles.categoryText,
-                        { color: normalizeCategoryColor(row.categoryColor) },
-                      ]}
-                    >
-                      {row.categoryName}
-                    </Text>{" "}
-                    | {row.habitName}
-                  </Text>
-                  {editingHistoryId === row.id ? (
-                    <>
-                      <TextInput
-                        style={styles.input}
-                        value={editingDate}
-                        onChangeText={setEditingDate}
-                        placeholder="Date (d/m/yyyy)"
-                        placeholderTextColor={theme.colors.textSecondary}
-                      />
-                      <View style={styles.filterChips}>
-                        {categoryOptions.map((category) => {
-                          const isActive = editingCategoryId === category.id;
-                          return (
-                            <TouchableOpacity
-                              key={`${row.id}-${category.id}`}
-                              style={[
-                                styles.filterChip,
-                                { borderColor: category.color },
-                                isActive && { backgroundColor: category.color },
-                              ]}
-                              onPress={() => setEditingCategoryId(category.id)}
-                            >
-                              <Text
-                                style={[
-                                  styles.filterChipText,
-                                  isActive && styles.filterChipTextActive,
-                                ]}
-                              >
-                                {category.name}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                      <TextInput
-                        style={styles.input}
-                        value={editingValue}
-                        onChangeText={setEditingValue}
-                        placeholder="Value"
-                        placeholderTextColor={theme.colors.textSecondary}
-                        keyboardType="numeric"
-                      />
-                      <TextInput
-                        style={[styles.input, styles.editNotesInput]}
-                        value={editingNotes}
-                        onChangeText={setEditingNotes}
-                        placeholder="Notes (optional)"
-                        placeholderTextColor={theme.colors.textSecondary}
-                        multiline
-                      />
-                      <View style={styles.editInlineActions}>
-                        <TouchableOpacity
-                          style={styles.editBtn}
-                          onPress={() => onSaveHistoryEdit(row.id)}
-                        >
-                          <Text style={styles.editBtnText}>Save</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.cancelBtn}
-                          onPress={onCancelHistoryEdit}
-                        >
-                          <Text style={styles.cancelBtnText}>Cancel</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </>
-                  ) : (
-                    <Text style={styles.secondaryText}>
-                      Value: {row.value}
-                      {row.notes ? ` | ${row.notes}` : ""}
-                    </Text>
-                  )}
-                </View>
-                <View style={styles.historyActions}>
-                  {editingHistoryId !== row.id ? (
-                    <TouchableOpacity
-                      style={styles.editBtn}
-                      onPress={() => onStartHistoryEdit(row)}
-                    >
-                      <Text style={styles.editBtnText}>Edit</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  <TouchableOpacity
-                    style={styles.deleteBtn}
-                    onPress={() => onDeleteHistoryRow(row.id)}
-                  >
-                    <Text style={styles.deleteBtnText}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
-          )}
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.background },
-  container: {
-    padding: 16,
-    paddingBottom: 24,
-    backgroundColor: theme.colors.background,
-  },
-  title: {
-    color: theme.colors.accent,
-    fontSize: 52,
-    fontWeight: "900",
-    lineHeight: 56,
-  },
-  subtitle: {
-    color: theme.colors.accent,
-    fontSize: 20,
-    fontWeight: "800",
-    marginBottom: 6,
-  },
-  secondaryText: { color: theme.colors.textSecondary, marginBottom: 8 },
-  card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 14,
-  },
-  cardTitle: {
-    color: theme.colors.textPrimary,
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 10,
-  },
-  rowText: {
-    color: theme.colors.textPrimary,
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: theme.colors.background,
-    color: theme.colors.textPrimary,
-    borderColor: theme.colors.border,
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 8,
-  },
-  filterChips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 10,
-  },
-  filterChip: {
-    backgroundColor: theme.colors.background,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  filterChipText: {
-    color: theme.colors.textPrimary,
-    fontWeight: "600",
-  },
-  filterChipTextActive: {
-    color: "#FFFFFF",
-  },
-  categoryText: { fontWeight: "700" },
-  historyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderTopColor: theme.colors.border,
-    borderTopWidth: 1,
-    paddingTop: 10,
-    marginTop: 10,
-  },
-  historyActions: {
-    marginLeft: 10,
-    gap: 8,
-  },
-  editInlineActions: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 8,
-  },
-  editNotesInput: {
-    minHeight: 80,
-    textAlignVertical: "top",
-  },
-  editBtn: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-  },
-  editBtnText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-  },
-  cancelBtn: {
-    backgroundColor: "#E2E8F0",
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-  },
-  cancelBtnText: {
-    color: "#0F172A",
-    fontWeight: "700",
-  },
-  deleteBtn: {
-    backgroundColor: "#FEE2E2",
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    marginLeft: 10,
-  },
-  deleteBtnText: {
-    color: "#B91C1C",
-    fontWeight: "700",
-  },
-  logButton: {
-    width: "100%",
-    backgroundColor: theme.colors.accent,
-    borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginBottom: 14,
-  },
-  logButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "800",
-    fontSize: 16,
-  },
-  manageButton: {
-    width: "100%",
-    backgroundColor: theme.colors.surface,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  manageButtonText: {
-    color: theme.colors.textPrimary,
-    fontWeight: "700",
-    fontSize: 15,
-  },
-});
+function GoalRow({
+  label, done, target, accentColor, textSecondary, textPrimary,
+}: {
+  label: string; done: number; target: number;
+  accentColor: string; textSecondary: string; textPrimary: string;
+}) {
+  const pct = Math.min(100, (done / target) * 100);
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+        <Text style={{ color: textPrimary, fontSize: 13 }}>{label}</Text>
+        <Text style={{ color: textSecondary, fontSize: 13 }}>{done}/{target}</Text>
+      </View>
+      <View style={{ height: 6, backgroundColor: "#333333", borderRadius: 3, overflow: "hidden" }}>
+        <View style={{ height: 6, width: `${pct}%`, backgroundColor: accentColor, borderRadius: 3 }} />
+      </View>
+    </View>
+  );
+}
+
+const createStyles = (theme: any) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: theme.background },
+    container: { padding: 16, paddingBottom: 40 },
+
+    // Countdown
+    countdownSection: { alignItems: "center", marginBottom: 20, paddingVertical: 8 },
+    countdownNumber: { color: theme.accent, fontSize: 80, fontWeight: "900", lineHeight: 84 },
+    countdownLabel: { color: theme.accent, fontSize: 22, fontWeight: "800", marginBottom: 4 },
+    countdownSub: { color: theme.textSecondary, fontSize: 13, marginBottom: 12 },
+    phaseTrack: { width: "100%", height: 8, backgroundColor: theme.surface, borderRadius: 4, overflow: "hidden", marginBottom: 4 },
+    phaseFill: { height: 8, backgroundColor: theme.accent, borderRadius: 4 },
+    phaseLabel: { color: theme.textSecondary, fontSize: 12 },
+
+    // Cards
+    card: { backgroundColor: theme.surface, borderRadius: 14, padding: 16, marginBottom: 14 },
+    cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+    cardTitle: { color: theme.textPrimary, fontSize: 16, fontWeight: "700" },
+    calTarget: { color: theme.textSecondary, fontSize: 13, marginTop: 8 },
+
+    // Day type segment
+    segRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+    seg: { flex: 1, backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1, borderRadius: 8, paddingVertical: 10, alignItems: "center" },
+    segActive: { backgroundColor: theme.accent, borderColor: theme.accent },
+    segText: { color: theme.textPrimary, fontWeight: "600" },
+    segTextActive: { color: "#FFFFFF" },
+
+    // Steppers
+    stepperValue: { color: theme.textSecondary, fontSize: 14, fontWeight: "600" },
+    stepperValueDone: { color: "#22C55E" },
+    progressTrack: { height: 10, backgroundColor: theme.background, borderRadius: 5, overflow: "hidden", marginBottom: 12 },
+    progressFill: { height: 10, backgroundColor: theme.accent, borderRadius: 5 },
+    progressFillDone: { backgroundColor: "#22C55E" },
+    stepperRow: { flexDirection: "row", gap: 8 },
+    stepBtn: { flex: 1, backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1, borderRadius: 8, paddingVertical: 10, alignItems: "center" },
+    stepBtnActive: { borderColor: theme.accent },
+    stepBtnText: { color: theme.textPrimary, fontWeight: "700", fontSize: 14 },
+    customRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+    customInput: { flex: 1, backgroundColor: theme.background, color: theme.textPrimary, borderColor: theme.border, borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 15 },
+    customAddBtn: { backgroundColor: theme.accent, borderRadius: 8, paddingHorizontal: 16, justifyContent: "center" },
+    customAddBtnText: { color: "#FFFFFF", fontWeight: "800" },
+
+    // Supplements
+    suppGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+    suppChip: { backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 12 },
+    suppChipActive: { backgroundColor: theme.accent, borderColor: theme.accent },
+    suppText: { color: theme.textSecondary, fontWeight: "600", fontSize: 13 },
+    suppTextActive: { color: "#FFFFFF" },
+
+    // CTAs
+    logBtn: { backgroundColor: theme.accent, borderRadius: 12, paddingVertical: 18, alignItems: "center", marginBottom: 10 },
+    logBtnText: { color: "#FFFFFF", fontWeight: "900", fontSize: 17 },
+    morningPulseBtn: { backgroundColor: theme.surface, borderRadius: 12, paddingVertical: 14, alignItems: "center", borderWidth: 1, borderColor: theme.border },
+    morningPulseBtnText: { color: theme.textPrimary, fontWeight: "700", fontSize: 15 },
+  });
