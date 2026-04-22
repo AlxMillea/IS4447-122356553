@@ -16,7 +16,7 @@ export const habits = sqliteTable("habits", {
       onDelete: "restrict",
       onUpdate: "cascade",
     }),
-  metricType: text("metric_type").notNull(), // 'count' | 'grams' | 'boolean'
+  metricType: text("metric_type").notNull(), 
 });
 
 export const targets = sqliteTable("targets", {
@@ -24,7 +24,7 @@ export const targets = sqliteTable("targets", {
   habitId: integer("habit_id")
     .notNull()
     .references(() => habits.id, { onDelete: "cascade", onUpdate: "cascade" }),
-  period: text("period").notNull(), // 'daily' | 'weekly' | 'monthly'
+  period: text("period").notNull(), 
   targetValue: integer("target_value").notNull(),
 });
 
@@ -33,7 +33,7 @@ export const habitLogs = sqliteTable("habit_logs", {
   habitId: integer("habit_id")
     .notNull()
     .references(() => habits.id, { onDelete: "cascade", onUpdate: "cascade" }),
-  date: text("date").notNull(), // ISO string
+  date: text("date").notNull(), 
   value: real("value").notNull(),
   notes: text("notes"),
 });

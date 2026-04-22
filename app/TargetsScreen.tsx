@@ -1,291 +1,458 @@
-import { useCallback, useMemo, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useEffect, useState } from "react";
 import {
-  getHabitLogsByHabitIds,
-  getHabitsByNames,
-  getTargetsWithHabits,
-  parseDayMonthYear,
-} from "../db/db-repo";
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useAppTheme } from "../state/theme-provider";
 
-const GREEN = "#22C55E";
-const RED = "#EF4444";
+const CHICAGO_DATE = new Date("2026-05-25T00:00:00");
 
-type LogRow = { habitId: number; date: string; value: number };
-type TargetRow = {
-  habitId: number;
-  habitName: string;
-  period: string;
-  targetValue: number;
+
+const TAG_PRESETS: Record<string, { bg: string; color: string }> = {
+  PR: { bg: "#FEF3C7", color: "#92400E" },
+  "2 PRs": { bg: "#FEF3C7", color: "#92400E" },
+  "3 PRs": { bg: "#FEF3C7", color: "#92400E" },
+  planned: { bg: "#EFF6FF", color: "#1D4ED8" },
+  "shoulder click": { bg: "#FFF7ED", color: "#C2410C" },
+  "cramps from sauna": { bg: "#FFF7ED", color: "#C2410C" },
+  "sauna damage": { bg: "#FFF7ED", color: "#C2410C" },
+  "forearm fatigue": { bg: "#FFF7ED", color: "#C2410C" },
+  Chicago: { bg: "#F0FDF4", color: "#166534" },
 };
 
-function startOfDay(value: Date): Date {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+type DayEntry = {
+  dayKey: string;
+  dayLabel: string;
+  dayNum: number;
+  month: string;
+  session: string;
+  tags: string[];
+  notes: string;
+  isRest: boolean;
+};
+
+type Week = {
+  num: number;
+  title: string;
+  dateRange: string;
+  weeksOut: string;
+  status: "done" | "current" | "upcoming";
+  days: DayEntry[];
+};
+
+const WEEKS: Week[] = [
+  {
+    num: 1, title: "Foundation", dateRange: "7 Apr – 13 Apr", weeksOut: "~7 weeks out", status: "done",
+    days: [
+      { dayKey: "2026-04-07", dayLabel: "Tue", dayNum: 7, month: "Apr", session: "Push", tags: ["cramps from sauna"], notes: "Cable fly, incline DB 48kg, bench barbell 70kg. First session back — good pump but sauna day before caused forearm cramps.", isRest: false },
+      { dayKey: "2026-04-08", dayLabel: "Wed", dayNum: 8, month: "Apr", session: "Arms", tags: [], notes: "Cable bicep curl, tricep pushdown, spider curl, incline curl. Good arm pump.", isRest: false },
+      { dayKey: "2026-04-09", dayLabel: "Thu", dayNum: 9, month: "Apr", session: "Pull + shoulders", tags: ["PR"], notes: "Lat pulldown 100kg, pull ups, straight arm pulldown, laterals 32kg. Leg press 230kg volume PR.", isRest: false },
+      { dayKey: "2026-04-10", dayLabel: "Fri", dayNum: 10, month: "Apr", session: "Push", tags: ["sauna damage"], notes: "Bench DB 60kg, barbell 75kg, cable fly. Forearms rock hard from 2 saunas — cramps throughout.", isRest: false },
+      { dayKey: "2026-04-11", dayLabel: "Sat", dayNum: 11, month: "Apr", session: "2km run", tags: [], notes: "Active recovery. Good call after back-to-back heavy days.", isRest: false },
+      { dayKey: "2026-04-12", dayLabel: "Sun", dayNum: 12, month: "Apr", session: "Legs + abs", tags: [], notes: "First dedicated leg session. Squat 90kg, leg press 230kg, RDL 90kg, hip thrust 110kg, cable crunch.", isRest: false },
+      { dayKey: "2026-04-13", dayLabel: "Mon", dayNum: 13, month: "Apr", session: "Push", tags: ["3 PRs"], notes: "Incline barbell 80kg, shoulder press 36kg, lateral raise 8.75kg. Best push session of the block.", isRest: false },
+    ],
+  },
+  {
+    num: 2, title: "Progressive overload", dateRange: "14 Apr – 20 Apr", weeksOut: "~6 weeks out", status: "done",
+    days: [
+      { dayKey: "2026-04-14", dayLabel: "Tue", dayNum: 14, month: "Apr", session: "Pull", tags: [], notes: "Lat pulldown 100kg, T-bar row (first time), dumbbell row 36kg, spider curl, cable curl 28.75kg, shrugs 60kg. Swim post session.", isRest: false },
+      { dayKey: "2026-04-15", dayLabel: "Wed", dayNum: 15, month: "Apr", session: "Legs + abs", tags: ["2 PRs"], notes: "Squat 95kg, leg press 240kg, hip thrust 120kg. Leg curl added for first time. Last gym session before trip away.", isRest: false },
+      { dayKey: "2026-04-16", dayLabel: "Thu", dayNum: 16, month: "Apr", session: "away — rest", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-04-17", dayLabel: "Fri", dayNum: 17, month: "Apr", session: "away — rest", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-04-18", dayLabel: "Sat", dayNum: 18, month: "Apr", session: "Home — full upper", tags: [], notes: "12.5kg DBs + press up bars + pull ups outdoors. High volume tempo work — 3 sec eccentric every rep. Adapted to available equipment.", isRest: false },
+      { dayKey: "2026-04-19", dayLabel: "Sun", dayNum: 19, month: "Apr", session: "rest", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-04-20", dayLabel: "Mon", dayNum: 20, month: "Apr", session: "Home — legs + abs", tags: [], notes: "Resistance bands + 10kg DBs. Band squat, RDL, Bulgarian split squat, band hip thrust, lunges, decline crunches.", isRest: false },
+    ],
+  },
+  {
+    num: 3, title: "Push intensity", dateRange: "21 Apr – 27 Apr", weeksOut: "~5 weeks out", status: "current",
+    days: [
+      { dayKey: "2026-04-21", dayLabel: "Tue", dayNum: 21, month: "Apr", session: "Push", tags: ["2 PRs", "shoulder click"], notes: "Cable fly 27.5kg PR, chest fly machine 45kg PR. Bench barbell 70kg. Shoulder click at 30kg DB press — monitor next session.", isRest: false },
+      { dayKey: "2026-04-22", dayLabel: "Wed", dayNum: 22, month: "Apr", session: "Pull", tags: ["forearm fatigue"], notes: "Forearm tightening mid-session — grip failing before back. Straps recommended.", isRest: false },
+      { dayKey: "2026-04-23", dayLabel: "Thu", dayNum: 23, month: "Apr", session: "rest", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-04-24", dayLabel: "Fri", dayNum: 24, month: "Apr", session: "Legs + abs", tags: ["planned"], notes: "Squat target 100kg. Leg press 245kg. Hip thrust 125kg. Keep building.", isRest: false },
+      { dayKey: "2026-04-25", dayLabel: "Sat", dayNum: 25, month: "Apr", session: "Upper — push or arms", tags: ["planned"], notes: "Chest 4 days out, arms 5+ days. Good push session or dedicated arms day.", isRest: false },
+      { dayKey: "2026-04-26", dayLabel: "Sun", dayNum: 26, month: "Apr", session: "rest", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-04-27", dayLabel: "Mon", dayNum: 27, month: "Apr", session: "Pull", tags: ["planned"], notes: "Buy straps before this session. T-bar row, lat pulldown, rows, bicep work.", isRest: false },
+    ],
+  },
+  {
+    num: 4, title: "Peak volume", dateRange: "28 Apr – 4 May", weeksOut: "~4 weeks out", status: "upcoming",
+    days: [
+      { dayKey: "2026-04-28", dayLabel: "Mon", dayNum: 28, month: "Apr", session: "Push", tags: ["planned"], notes: "Incline DB target 52kg. Shoulder press — drop to 28kg, monitor click. Cable fly target 30kg.", isRest: false },
+      { dayKey: "2026-04-29", dayLabel: "Tue", dayNum: 29, month: "Apr", session: "Pull", tags: ["planned"], notes: "T-bar row push. Lat pulldown target 105kg. Dumbbell row target 38kg. Use straps throughout.", isRest: false },
+      { dayKey: "2026-04-30", dayLabel: "Wed", dayNum: 30, month: "Apr", session: "rest / football", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-05-01", dayLabel: "Thu", dayNum: 1, month: "May", session: "Legs", tags: ["planned"], notes: "Squat target 102.5kg. Leg press 250kg. RDL 95kg. Leg curl progress.", isRest: false },
+      { dayKey: "2026-05-02", dayLabel: "Fri", dayNum: 2, month: "May", session: "rest", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-05-03", dayLabel: "Sat", dayNum: 3, month: "May", session: "Upper — arms + shoulders", tags: ["planned"], notes: "Arms focus — spider curl, cable curl, single arm curl away. Full shoulder volume.", isRest: false },
+      { dayKey: "2026-05-04", dayLabel: "Sun", dayNum: 4, month: "May", session: "rest", tags: [], notes: "", isRest: true },
+    ],
+  },
+  {
+    num: 5, title: "Hardest week", dateRange: "5 May – 11 May", weeksOut: "~3 weeks out", status: "upcoming",
+    days: [
+      { dayKey: "2026-05-05", dayLabel: "Mon", dayNum: 5, month: "May", session: "Push — failure sets", tags: ["planned"], notes: "Introduce failure sets on isolation work. One superset per session. Highest volume push of the block.", isRest: false },
+      { dayKey: "2026-05-06", dayLabel: "Tue", dayNum: 6, month: "May", session: "Pull — failure sets", tags: ["planned"], notes: "Failure on spider curls, cable curls. T-bar row maximum weight attempt.", isRest: false },
+      { dayKey: "2026-05-07", dayLabel: "Wed", dayNum: 7, month: "May", session: "rest / football", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-05-08", dayLabel: "Thu", dayNum: 8, month: "May", session: "Legs — hardest session", tags: ["planned"], notes: "Squat push to 107.5kg. Leg press 255kg+. This is the peak legs session before taper.", isRest: false },
+      { dayKey: "2026-05-09", dayLabel: "Fri", dayNum: 9, month: "May", session: "rest", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-05-10", dayLabel: "Sat", dayNum: 10, month: "May", session: "Upper — full volume", tags: ["planned"], notes: "Every upper muscle group. Supersets. Last truly hard session before deload begins.", isRest: false },
+      { dayKey: "2026-05-11", dayLabel: "Sun", dayNum: 11, month: "May", session: "rest — mandatory", tags: [], notes: "", isRest: true },
+    ],
+  },
+  {
+    num: 6, title: "Deload", dateRange: "12 May – 18 May", weeksOut: "~2 weeks out", status: "upcoming",
+    days: [
+      { dayKey: "2026-05-12", dayLabel: "Mon", dayNum: 12, month: "May", session: "Push — 70% volume", tags: ["planned"], notes: "Same weights as week 5, drop sets by 30%. Body adapts during deload not during hard weeks.", isRest: false },
+      { dayKey: "2026-05-13", dayLabel: "Tue", dayNum: 13, month: "May", session: "Pull — 70% volume", tags: ["planned"], notes: "Light lat work, controlled rows. Bicep volume reduced. Focus on feel not load.", isRest: false },
+      { dayKey: "2026-05-14", dayLabel: "Wed", dayNum: 14, month: "May", session: "rest", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-05-15", dayLabel: "Thu", dayNum: 15, month: "May", session: "Legs — 70% volume", tags: ["planned"], notes: "Squat stays same weight, 2 sets not 4. Leg press reduced. Let the legs recover fully.", isRest: false },
+      { dayKey: "2026-05-16", dayLabel: "Fri", dayNum: 16, month: "May", session: "rest — sleep priority", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-05-17", dayLabel: "Sat", dayNum: 17, month: "May", session: "Light upper", tags: ["planned"], notes: "Optional — pump session only. Light weight, high rep. Just to stay active.", isRest: false },
+      { dayKey: "2026-05-18", dayLabel: "Sun", dayNum: 18, month: "May", session: "rest — sleep 8h+", tags: [], notes: "", isRest: true },
+    ],
+  },
+  {
+    num: 7, title: "Final week", dateRange: "19 May – 25 May", weeksOut: "~1 week out", status: "upcoming",
+    days: [
+      { dayKey: "2026-05-19", dayLabel: "Mon", dayNum: 19, month: "May", session: "Light push", tags: ["planned"], notes: "Keep it easy. Maintain muscle, no fatigue going into Chicago.", isRest: false },
+      { dayKey: "2026-05-20", dayLabel: "Tue", dayNum: 20, month: "May", session: "rest", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-05-21", dayLabel: "Wed", dayNum: 21, month: "May", session: "Light pull", tags: ["planned"], notes: "Easy rows and lat work. Stay loose.", isRest: false },
+      { dayKey: "2026-05-22", dayLabel: "Thu", dayNum: 22, month: "May", session: "rest", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-05-23", dayLabel: "Fri", dayNum: 23, month: "May", session: "rest — travel prep", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-05-24", dayLabel: "Sat", dayNum: 24, month: "May", session: "rest — travel day", tags: [], notes: "", isRest: true },
+      { dayKey: "2026-05-25", dayLabel: "Sun", dayNum: 25, month: "May", session: "Chicago", tags: ["Chicago"], notes: "Departure day.", isRest: false },
+    ],
+  },
+];
+
+function daysToChicago(): number {
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const chiStart = new Date(CHICAGO_DATE.getFullYear(), CHICAGO_DATE.getMonth(), CHICAGO_DATE.getDate());
+  return Math.max(0, Math.round((chiStart.getTime() - todayStart.getTime()) / 86400000));
+}
+
+function computeSessionsDone(): number {
+  const todayStr = new Date().toISOString().split("T")[0];
+  let count = 0;
+  for (const week of WEEKS) {
+    for (const day of week.days) {
+      if (day.isRest) continue;
+      if (week.status === "done") { count++; continue; }
+      if (week.status === "current" && day.dayKey <= todayStr) count++;
+    }
+  }
+  return count;
+}
+
+function computeTotalSessions(): number {
+  return WEEKS.reduce((sum, w) => sum + w.days.filter((d) => !d.isRest).length, 0);
 }
 
 export default function TargetsScreen() {
   const { theme } = useAppTheme();
   const styles = createStyles(theme);
-  const [rows, setRows] = useState<TargetRow[]>([]);
-  const [logs, setLogs] = useState<LogRow[]>([]);
 
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      (async () => {
-        const targets = (await getTargetsWithHabits()) as TargetRow[];
-        const habits = await getHabitsByNames([
-          "Gym Session",
-          "Football Session",
-          "Hit 185g Protein",
-          "Calories (Gym Day)",
-          "Calories (Rest Day)",
-          "Water Intake (ml)",
-        ]);
-        const habitIds = habits.map((h) => h.id);
-        const allLogs = (await getHabitLogsByHabitIds(habitIds)) as LogRow[];
-        if (!active) return;
-        setRows(targets);
-        setLogs(allLogs);
-      })();
-      return () => {
-        active = false;
-      };
-    }, []),
-  );
+  const currentWeekNum = WEEKS.find((w) => w.status === "current")?.num ?? 3;
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set([currentWeekNum]));
+  const [editingDay, setEditingDay] = useState<DayEntry | null>(null);
+  const [editNotes, setEditNotes] = useState("");
+  const [editSession, setEditSession] = useState("");
+  const [customNotes, setCustomNotes] = useState<Record<string, string>>({});
+  const [customSession, setCustomSession] = useState<Record<string, string>>({});
 
-  const referenceDate = useMemo(() => {
-    if (!logs.length) return null;
-    const sorted = Array.from(new Set(logs.map((l) => l.date))).sort(
-      (a, b) => parseDayMonthYear(a).getTime() - parseDayMonthYear(b).getTime(),
-    );
-    return sorted[sorted.length - 1] ?? null;
-  }, [logs]);
+  useEffect(() => {
+    (async () => {
+      const keys = await AsyncStorage.getAllKeys();
+      const trainingKeys = keys.filter((k) => k.startsWith("training_"));
+      if (!trainingKeys.length) return;
+      const pairs = await AsyncStorage.multiGet(trainingKeys);
+      const notes: Record<string, string> = {};
+      const sessions: Record<string, string> = {};
+      for (const [key, val] of pairs) {
+        if (!val) continue;
+        if (key.startsWith("training_notes_")) notes[key.replace("training_notes_", "")] = val;
+        if (key.startsWith("training_session_")) sessions[key.replace("training_session_", "")] = val;
+      }
+      setCustomNotes(notes);
+      setCustomSession(sessions);
+    })();
+  }, []);
 
-  const referenceDateObj = useMemo(
-    () => (referenceDate ? startOfDay(parseDayMonthYear(referenceDate)) : null),
-    [referenceDate],
-  );
-
-  const logsInLastDays = useCallback(
-    (days: number) => {
-      if (!referenceDateObj) return [];
-      const maxDiff = (days - 1) * 24 * 60 * 60 * 1000;
-      return logs.filter((row) => {
-        const rowDate = startOfDay(parseDayMonthYear(row.date));
-        const diff = referenceDateObj.getTime() - rowDate.getTime();
-        return diff >= 0 && diff <= maxDiff;
-      });
-    },
-    [logs, referenceDateObj],
-  );
-
-  const referenceLogs = useMemo(
-    () => (referenceDate ? logs.filter((l) => l.date === referenceDate) : []),
-    [logs, referenceDate],
-  );
-
-  const countLogs = useCallback(
-    (habitName: string, options?: { minValue?: number; days?: number }) => {
-      const target = rows.find((r) => r.habitName === habitName);
-      if (!target) return 0;
-      const minValue = options?.minValue ?? 1;
-      const source = options?.days ? logsInLastDays(options.days) : logs;
-      return source.filter(
-        (l) => l.habitId === target.habitId && l.value >= minValue,
-      ).length;
-    },
-    [logs, logsInLastDays, rows],
-  );
-
-  const proteinHitDays = useCallback(
-    (days?: number) => {
-      const target = rows.find((r) => r.habitName === "Hit 185g Protein");
-      if (!target) return 0;
-      const source = days ? logsInLastDays(days) : logs;
-      return new Set(
-        source
-          .filter((l) => l.habitId === target.habitId && l.value >= 185)
-          .map((l) => l.date),
-      ).size;
-    },
-    [logs, logsInLastDays, rows],
-  );
-
-  const dailyValue = (habitName: string) => {
-    const target = rows.find((r) => r.habitName === habitName);
-    if (!target) return null;
-    const found = referenceLogs.find((l) => l.habitId === target.habitId);
-    return found?.value ?? null;
+  const toggleWeek = (num: number) => {
+    setExpandedWeeks((prev) => {
+      const next = new Set(prev);
+      if (next.has(num)) next.delete(num);
+      else next.add(num);
+      return next;
+    });
   };
 
-  const getTarget = (habitName: string, period: string, fallback: number) =>
-    rows.find((r) => r.habitName === habitName && r.period === period)
-      ?.targetValue ?? fallback;
-
-  const Progress = ({
-    label,
-    done,
-    target,
-    mode,
-  }: {
-    label: string;
-    done: number;
-    target: number;
-    mode: "min" | "max";
-  }) => {
-    const pct = Math.max(0, Math.min(100, (done / target) * 100));
-    const exceededBad = mode === "max" && done > target;
-    const unmet = mode === "min" && done < target;
-    const barColor =
-      exceededBad || unmet ? RED : done > target ? GREEN : theme.accent;
-
-    return (
-      <View style={styles.card}>
-        <Text style={styles.primary}>{label}</Text>
-        <View style={styles.track}>
-          <View
-            style={[
-              styles.fill,
-              { width: `${pct}%`, backgroundColor: barColor },
-            ]}
-          />
-        </View>
-        <Text
-          style={[styles.secondary, (exceededBad || unmet) && { color: RED }]}
-        >
-          {mode === "max"
-            ? done > target
-              ? `${Math.round(done - target)} over target`
-              : `${Math.round(target - done)} remaining`
-            : done >= target
-              ? `On track`
-              : `${Math.round(target - done)} remaining (unmet so far)`}
-        </Text>
-      </View>
-    );
+  const openDay = (day: DayEntry) => {
+    if (day.isRest) return;
+    setEditingDay(day);
+    setEditNotes(customNotes[day.dayKey] ?? day.notes);
+    setEditSession(customSession[day.dayKey] ?? day.session);
   };
+
+  const saveEdit = async () => {
+    if (!editingDay) return;
+    await AsyncStorage.setItem(`training_notes_${editingDay.dayKey}`, editNotes);
+    await AsyncStorage.setItem(`training_session_${editingDay.dayKey}`, editSession);
+    setCustomNotes((prev) => ({ ...prev, [editingDay.dayKey]: editNotes }));
+    setCustomSession((prev) => ({ ...prev, [editingDay.dayKey]: editSession }));
+    setEditingDay(null);
+  };
+
+  const sessionsDone = computeSessionsDone();
+  const totalSessions = computeTotalSessions();
+  const planPct = Math.round((sessionsDone / totalSessions) * 100);
+  const daysLeft = daysToChicago();
+  const weeksLeft = (daysLeft / 7).toFixed(1);
+
+  const editingWeek = editingDay ? WEEKS.find((w) => w.days.some((d) => d.dayKey === editingDay.dayKey)) : null;
+  const isEditable = editingWeek?.status !== "done";
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 24 }}
-    >
-      <Text style={styles.title}>Global Targets (5 Weeks)</Text>
-      <Progress
-        label="Gym Sessions (20)"
-        done={countLogs("Gym Session")}
-        target={getTarget("Gym Session", "global_5w", 20)}
-        mode="min"
-      />
-      <Progress
-        label="Football Sessions (5)"
-        done={countLogs("Football Session")}
-        target={getTarget("Football Session", "global_5w", 5)}
-        mode="min"
-      />
-      <Progress
-        label="Protein Days ≥185g (35)"
-        done={proteinHitDays()}
-        target={getTarget("Hit 185g Protein", "global_5w", 35)}
-        mode="min"
-      />
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
 
-      <Text style={styles.title}>Weekly Targets (Last 7 Days)</Text>
-      <Progress
-        label="Gym Sessions (weekly)"
-        done={countLogs("Gym Session", { days: 7 })}
-        target={getTarget("Gym Session", "weekly", 4)}
-        mode="min"
-      />
-      <Progress
-        label="Football Sessions (weekly)"
-        done={countLogs("Football Session", { days: 7 })}
-        target={getTarget("Football Session", "weekly", 1)}
-        mode="min"
-      />
-      <Progress
-        label="Protein Days ≥185g (weekly)"
-        done={proteinHitDays(7)}
-        target={getTarget("Hit 185g Protein", "weekly", 7)}
-        mode="min"
-      />
+      {/* Stats 2x2 */}
+      <View style={styles.statsRow}>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>days to Chicago</Text>
+          <Text style={styles.statValue}>{daysLeft}</Text>
+          <Text style={styles.statSub}>departs 25 May</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>weeks remaining</Text>
+          <Text style={styles.statValue}>{weeksLeft}</Text>
+          <Text style={styles.statSub}>inc. this week</Text>
+        </View>
+      </View>
+      <View style={[styles.statsRow, { marginBottom: 16 }]}>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>sessions done</Text>
+          <Text style={styles.statValue}>{sessionsDone}</Text>
+          <Text style={styles.statSub}>since 7 Apr</Text>
+        </View>
+      </View>
 
-      <Text style={styles.title}>Monthly Targets (Last 30 Days)</Text>
-      <Progress
-        label="Gym Sessions (monthly)"
-        done={countLogs("Gym Session", { days: 30 })}
-        target={getTarget("Gym Session", "monthly", 16)}
-        mode="min"
-      />
-      <Progress
-        label="Football Sessions (monthly)"
-        done={countLogs("Football Session", { days: 30 })}
-        target={getTarget("Football Session", "monthly", 4)}
-        mode="min"
-      />
-      <Progress
-        label="Protein Days ≥185g (monthly)"
-        done={proteinHitDays(30)}
-        target={getTarget("Hit 185g Protein", "monthly", 30)}
-        mode="min"
-      />
+      {/* Plan progress */}
+      <View style={{ marginBottom: 20 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+          <Text style={styles.progressLabel}>plan progress</Text>
+          <Text style={styles.progressLabel}>{planPct}%</Text>
+        </View>
+        <View style={styles.track}>
+          <View style={[styles.fill, { width: `${planPct}%` }]} />
+        </View>
+      </View>
 
-      <Text style={styles.title}>Daily Baselines (Latest Day)</Text>
-      <Text style={styles.secondary}>Using logs from: {referenceDate ?? "N/A"}</Text>
-      <Progress
-        label="Gym Day Calories (≤2800)"
-        done={dailyValue("Calories (Gym Day)") ?? 0}
-        target={getTarget("Calories (Gym Day)", "daily_baseline", 2800)}
-        mode="max"
-      />
-      <Progress
-        label="Rest Day Calories (≤2100)"
-        done={dailyValue("Calories (Rest Day)") ?? 0}
-        target={getTarget("Calories (Rest Day)", "daily_baseline", 2100)}
-        mode="max"
-      />
-      <Progress
-        label="Protein Floor (≥185g)"
-        done={dailyValue("Hit 185g Protein") ?? 0}
-        target={getTarget("Hit 185g Protein", "daily_baseline", 185)}
-        mode="min"
-      />
-      <Progress
-        label="Water (≥3.5L)"
-        done={dailyValue("Water Intake (ml)") ?? 0}
-        target={getTarget("Water Intake (ml)", "daily_baseline", 3500)}
-        mode="min"
-      />
+      {/* Week by week */}
+      <Text style={styles.weekByWeekLabel}>WEEK BY WEEK</Text>
+      {WEEKS.map((week) => {
+        const isExpanded = expandedWeeks.has(week.num);
+        const todayStr = new Date().toISOString().split("T")[0];
+        const statusColor =
+          week.status === "done" ? "#22C55E" :
+          week.status === "current" ? "#3B82F6" :
+          theme.textSecondary;
+        const statusLabel =
+          week.status === "done" ? "done" :
+          week.status === "current" ? "current" :
+          "upcoming";
+
+        return (
+          <View
+            key={week.num}
+            style={[
+              styles.weekCard,
+              week.status === "current" && { borderColor: "#3B82F6", borderWidth: 1.5 },
+            ]}
+          >
+            <TouchableOpacity style={styles.weekHeader} onPress={() => toggleWeek(week.num)} activeOpacity={0.7}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.weekTitle}>Week {week.num} — {week.title}</Text>
+                <Text style={styles.weekSub}>{week.dateRange} · {week.weeksOut}</Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View style={[styles.statusBadge, { borderColor: statusColor }]}>
+                  <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+                </View>
+                <Text style={[styles.chevron, { color: theme.textSecondary }]}>{isExpanded ? "▲" : "▼"}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {isExpanded && week.days.map((day, idx) => {
+              const resolvedSession = customSession[day.dayKey] ?? day.session;
+              const resolvedNotes = customNotes[day.dayKey] ?? day.notes;
+              const isPast = day.dayKey < todayStr;
+              const isToday = day.dayKey === todayStr;
+
+              return (
+                <TouchableOpacity
+                  key={day.dayKey}
+                  style={[
+                    styles.dayRow,
+                    idx === 0 && { borderTopWidth: 1, borderTopColor: theme.border },
+                    isToday && { backgroundColor: theme.accent + "18" },
+                  ]}
+                  onPress={() => openDay(day)}
+                  disabled={day.isRest}
+                  activeOpacity={day.isRest ? 1 : 0.6}
+                >
+                  <View style={styles.dayDateCol}>
+                    <Text style={styles.dayDayLabel}>{day.dayLabel}</Text>
+                    <Text style={[styles.dayNum, isPast || isToday ? { color: theme.textPrimary } : { color: theme.textSecondary }]}>
+                      {day.dayNum}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 5, marginBottom: resolvedNotes ? 3 : 0 }}>
+                      <Text style={day.isRest ? styles.restText : styles.sessionText}>{resolvedSession}</Text>
+                      {day.tags.map((tag) => {
+                        const ts = TAG_PRESETS[tag] ?? { bg: "#F3F4F6", color: "#374151" };
+                        return (
+                          <View key={tag} style={[styles.tag, { backgroundColor: ts.bg }]}>
+                            <Text style={[styles.tagText, { color: ts.color }]}>{tag}</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                    {!!resolvedNotes && (
+                      <Text style={styles.dayNotes} numberOfLines={2}>{resolvedNotes}</Text>
+                    )}
+                  </View>
+                  {!day.isRest && (
+                    <Text style={[styles.editHint, { color: theme.textSecondary }]}>›</Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        );
+      })}
+
+      {/* Edit / View modal */}
+      <Modal
+        visible={!!editingDay}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setEditingDay(null)}
+      >
+        {editingDay && (
+          <ScrollView
+            style={{ flex: 1, backgroundColor: theme.background }}
+            contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
+          >
+            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
+              {editingDay.dayLabel} {editingDay.dayNum} {editingDay.month}
+            </Text>
+            {editingDay.tags.length > 0 && (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+                {editingDay.tags.map((tag) => {
+                  const ts = TAG_PRESETS[tag] ?? { bg: "#F3F4F6", color: "#374151" };
+                  return (
+                    <View key={tag} style={[styles.tag, { backgroundColor: ts.bg }]}>
+                      <Text style={[styles.tagText, { color: ts.color }]}>{tag}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {isEditable ? (
+              <>
+                <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>Session</Text>
+                <TextInput
+                  style={[styles.modalInput, { backgroundColor: theme.surface, color: theme.textPrimary, borderColor: theme.border }]}
+                  value={editSession}
+                  onChangeText={setEditSession}
+                  placeholderTextColor={theme.textSecondary}
+                />
+                <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>Notes</Text>
+                <TextInput
+                  style={[styles.modalInput, { minHeight: 120, textAlignVertical: "top", backgroundColor: theme.surface, color: theme.textPrimary, borderColor: theme.border }]}
+                  value={editNotes}
+                  onChangeText={setEditNotes}
+                  multiline
+                  placeholderTextColor={theme.textSecondary}
+                />
+                <TouchableOpacity style={[styles.saveBtn, { backgroundColor: theme.accent }]} onPress={saveEdit}>
+                  <Text style={styles.saveBtnText}>Save</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={[styles.modalSession, { color: theme.textPrimary }]}>{editingDay.session}</Text>
+                {!!editingDay.notes && (
+                  <Text style={[styles.modalNotes, { color: theme.textSecondary }]}>{editingDay.notes}</Text>
+                )}
+              </>
+            )}
+
+            <TouchableOpacity
+              style={[styles.cancelBtn, { backgroundColor: theme.surface, marginTop: 12 }]}
+              onPress={() => setEditingDay(null)}
+            >
+              <Text style={[styles.cancelBtnText, { color: theme.textPrimary }]}>Close</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        )}
+      </Modal>
     </ScrollView>
   );
 }
 
 const createStyles = (theme: any) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.background, padding: 16 },
-    title: {
-      color: theme.textPrimary,
-      fontSize: 18,
-      marginBottom: 10,
-      marginTop: 8,
-      fontWeight: "700",
-    },
-    card: {
-      backgroundColor: theme.surface,
-      borderRadius: 8,
-      padding: 16,
-      marginBottom: 10,
-    },
-    primary: { color: theme.textPrimary, marginBottom: 8 },
-    secondary: { color: theme.textSecondary, marginTop: 8 },
-    track: {
-      height: 10,
-      backgroundColor: "#E5E7EB",
-      borderRadius: 6,
-      overflow: "hidden",
-    },
-    fill: { height: 10, borderRadius: 6 },
+    container: { flex: 1, backgroundColor: theme.background },
+    statsRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
+    statCard: { flex: 1, backgroundColor: theme.surface, borderRadius: 12, padding: 14 },
+    statLabel: { color: theme.textSecondary, fontSize: 11, marginBottom: 4 },
+    statValue: { color: theme.textPrimary, fontSize: 32, fontWeight: "700", letterSpacing: -1, marginBottom: 2 },
+    statSub: { color: theme.textSecondary, fontSize: 11 },
+    progressLabel: { color: theme.textSecondary, fontSize: 12 },
+    track: { height: 8, backgroundColor: theme.border, borderRadius: 6, overflow: "hidden" },
+    fill: { height: 8, backgroundColor: "#3B82F6", borderRadius: 6 },
+    sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+    sectionHeaderText: { color: theme.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1 },
+    chevron: { fontSize: 10 },
+    prRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, backgroundColor: theme.surface, borderRadius: 8, padding: 12, marginBottom: 6 },
+    prDot: { width: 7, height: 7, borderRadius: 4, marginTop: 5 },
+    prText: { color: theme.textPrimary, fontSize: 13, flex: 1 },
+    weekByWeekLabel: { color: theme.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 10 },
+    weekCard: { backgroundColor: theme.surface, borderRadius: 12, marginBottom: 10, overflow: "hidden" },
+    weekHeader: { flexDirection: "row", alignItems: "center", padding: 16 },
+    weekTitle: { color: theme.textPrimary, fontSize: 15, fontWeight: "700" },
+    weekSub: { color: theme.textSecondary, fontSize: 12, marginTop: 2 },
+    statusBadge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+    statusText: { fontSize: 11, fontWeight: "600" },
+    dayRow: { flexDirection: "row", alignItems: "flex-start", paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: theme.border },
+    dayDateCol: { width: 36, marginRight: 12 },
+    dayDayLabel: { color: theme.textSecondary, fontSize: 10, marginBottom: 1 },
+    dayNum: { fontSize: 15, fontWeight: "700" },
+    sessionText: { color: theme.textPrimary, fontSize: 13, fontWeight: "600" },
+    restText: { color: theme.textSecondary, fontSize: 13, fontStyle: "italic" },
+    tag: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
+    tagText: { fontSize: 10, fontWeight: "600" },
+    dayNotes: { color: theme.textSecondary, fontSize: 11, marginTop: 3, lineHeight: 15 },
+    editHint: { fontSize: 18, marginLeft: 8, alignSelf: "center" },
+    modalTitle: { fontSize: 20, fontWeight: "700", marginBottom: 12 },
+    modalLabel: { fontSize: 12, marginBottom: 4, marginTop: 12 },
+    modalInput: { borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 14, marginBottom: 4 },
+    modalSession: { fontSize: 16, fontWeight: "600", marginBottom: 10 },
+    modalNotes: { fontSize: 14, lineHeight: 20 },
+    saveBtn: { borderRadius: 8, paddingVertical: 12, alignItems: "center", marginTop: 16 },
+    saveBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 15 },
+    cancelBtn: { borderRadius: 8, paddingVertical: 12, alignItems: "center" },
+    cancelBtnText: { fontWeight: "600", fontSize: 15 },
   });
-

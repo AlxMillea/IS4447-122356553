@@ -137,9 +137,6 @@ export default function RawDataAdmin() {
 
   return (
     <View>
-      <View style={styles.requirementBadge}>
-        <Text style={styles.requirementText}>Academic Requirement: Manual CRUD Operations (Core #1 & #5)</Text>
-      </View>
 
       {/* CREATE */}
       <View style={styles.card}>
@@ -222,7 +219,7 @@ export default function RawDataAdmin() {
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity style={styles.deleteBtn} onPress={() => onDelete(row.id)}>
-                  <Text style={styles.deleteBtnText}>Del</Text>
+                  <Text style={styles.deleteBtnText}>Delete</Text>
                 </TouchableOpacity>
               </View>
             </View>

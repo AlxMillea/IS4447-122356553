@@ -25,7 +25,7 @@ import type { HomeStackParamList } from "./HomeLogsScreen";
 import MorningPulseModal from "./MorningPulseModal";
 
 const CHICAGO_TRIP_DATE = new Date("2026-05-25T00:00:00");
-const PHASE_START = new Date("2026-04-21T00:00:00");
+const PHASE_START = new Date("2026-04-07T00:00:00");
 const PROTEIN_TARGET = 185;
 const WATER_TARGET = 3500;
 
@@ -237,7 +237,7 @@ export default function HomeOverviewScreen() {
           <View style={styles.phaseTrack}>
             <View style={[styles.phaseFill, { width: `${phasePct}%` }]} />
           </View>
-          <Text style={styles.phaseLabel}>{phasePct}% through 5-week phase</Text>
+          <Text style={styles.phaseLabel}>{phasePct}% through 7-week phase</Text>
         </View>
 
         {/* ── DAY TYPE ── */}
@@ -365,7 +365,7 @@ export default function HomeOverviewScreen() {
 
         {/* ── GLOBAL GOALS ── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>5-Week Goals</Text>
+          <Text style={styles.cardTitle}>7-Week Goals</Text>
           <GoalRow
             label="Gym Sessions"
             done={globalTargets.gymDone}

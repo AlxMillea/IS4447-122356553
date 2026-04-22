@@ -11,6 +11,12 @@ import { useAppTheme } from "../state/theme-provider";
 
 const chartWidth = Dimensions.get("window").width - 32;
 const expectedCurve = [90, 89, 88, 87, 86];
+const PHASE_START = new Date("2026-04-07T00:00:00");
+
+function currentWeekNum(): number {
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+  return Math.min(7, Math.max(1, Math.ceil((Date.now() - PHASE_START.getTime()) / msPerWeek)));
+}
 
 type TimeView = "daily" | "weekly" | "monthly";
 type LogRow = { habitId: number; date: string; value: number };
@@ -232,7 +238,7 @@ export default function InsightsScreen() {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 24 }}
     >
-      <Text style={styles.header}>Phase Progress: Week 5 of 5 - Peak Bulk</Text>
+      <Text style={styles.header}>Phase Progress: Week {currentWeekNum()} of 7</Text>
 
       <View style={styles.segmentRow}>
         {(["daily", "weekly", "monthly"] as TimeView[]).map((value) => {

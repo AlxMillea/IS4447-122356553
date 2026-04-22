@@ -9,10 +9,10 @@ function formatDayMonthYear(date: Date): string {
 
 async function insertChicagoCountdownData(tx: any) {
   await tx.insert(categories).values([
-    { name: "Train", color: CATEGORY_COLORS.Train, icon: "dumbbell" },
-    { name: "Fuel", color: CATEGORY_COLORS.Fuel, icon: "fork-knife" },
-    { name: "Recover", color: CATEGORY_COLORS.Recover, icon: "moon" },
-    { name: "Measure", color: CATEGORY_COLORS.Measure, icon: "scale" },
+    { name: "Train", color: CATEGORY_COLORS.Train},
+    { name: "Fuel", color: CATEGORY_COLORS.Fuel},
+    { name: "Recover", color: CATEGORY_COLORS.Recover},
+    { name: "Measure", color: CATEGORY_COLORS.Measure},
   ]);
 
   const categoryRows = await tx.select().from(categories);

@@ -21,7 +21,6 @@ export default function LoginPage({ onEnter }: LoginPageProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Chicago Tracker</Text>
-      <Text style={styles.subtitle}>Fake Login</Text>
 
       <TextInput
         style={styles.input}
@@ -63,12 +62,6 @@ const createStyles = (theme: any) =>
       fontWeight: "900",
       textAlign: "center",
       marginBottom: 6,
-    },
-    subtitle: {
-      color: theme.textSecondary,
-      textAlign: "center",
-      marginBottom: 18,
-      fontSize: 16,
     },
     input: {
       backgroundColor: theme.surface,

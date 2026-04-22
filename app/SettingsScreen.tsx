@@ -9,6 +9,7 @@ import {
 import { exportDataToCSV } from "../db/db-repo";
 import { useAppTheme } from "../state/theme-provider";
 import CategoriesScreen from "./CategoriesScreen";
+import HevyImport from "./HevyImport";
 import RawDataAdmin from "./RawDataAdmin";
 
 export default function SettingsScreen() {
@@ -26,10 +27,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-    >
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.card}>
         <Text style={styles.title}>Theme</Text>
         <View style={styles.row}>
@@ -60,6 +58,10 @@ export default function SettingsScreen() {
         <CategoriesScreen embedded />
       </View>
 
+      <View style={styles.card}>
+        <HevyImport />
+      </View>
+
       <RawDataAdmin />
     </ScrollView>
   );
@@ -68,13 +70,19 @@ export default function SettingsScreen() {
 const createStyles = (theme: any) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background },
+    content: { padding: 16, paddingBottom: 40 },
     card: {
       backgroundColor: theme.surface,
       borderRadius: 10,
       padding: 12,
       marginBottom: 12,
     },
-    title: { color: theme.textPrimary, fontWeight: "700", marginBottom: 10, fontSize: 15 },
+    title: {
+      color: theme.textPrimary,
+      fontWeight: "700",
+      marginBottom: 10,
+      fontSize: 15,
+    },
     row: { flexDirection: "row", gap: 8 },
     button: {
       backgroundColor: theme.background,

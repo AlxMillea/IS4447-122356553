@@ -17,14 +17,13 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
           <User size={56} color={theme.accent} />
         </View>
         <Text style={styles.name}>Alex Millea</Text>
-        <Text style={styles.email}>122356553@umail.ucc.ie</Text>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>General Details</Text>
-        <Row styles={styles} label="Location" value="Cork, Ireland" />
+        <Row styles={styles} label="Location" value="Cork" />
         <Row styles={styles} label="Chicago Trip" value="25 May 2026" />
-        <Row styles={styles} label="Goal" value="Body Recomposition" />
+        <Row styles={styles} label="Goal" value="Getting in best shape possible" />
         <Row styles={styles} label="Training" value="4-Day Split + Football" />
         <Row styles={styles} label="Daily Protein" value="185 g" />
         <Row styles={styles} label="Gym Days" value="2,800 kcal" />
@@ -77,7 +76,6 @@ const createStyles = (theme: any) =>
       fontWeight: "800",
       marginBottom: 4,
     },
-    email: { color: theme.textSecondary, fontSize: 14 },
     card: {
       backgroundColor: theme.surface,
       borderRadius: 12,
