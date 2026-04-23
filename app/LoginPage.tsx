@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,16 +10,30 @@ import { useAppTheme } from "../state/theme-provider";
 
 export type LoginPageProps = {
   onEnter: () => void;
+  showDeletedBanner?: boolean;
+  onBannerDismissed?: () => void;
 };
 
-export default function LoginPage({ onEnter }: LoginPageProps) {
+export default function LoginPage({ onEnter, showDeletedBanner, onBannerDismissed }: LoginPageProps) {
   const { theme } = useAppTheme();
   const styles = createStyles(theme);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  useEffect(() => {
+    if (!showDeletedBanner) return;
+    const t = setTimeout(() => onBannerDismissed?.(), 3000);
+    return () => clearTimeout(t);
+  }, [showDeletedBanner, onBannerDismissed]);
+
   return (
     <View style={styles.container}>
+      {showDeletedBanner && (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>This profile has been deleted.</Text>
+        </View>
+      )}
+
       <Text style={styles.title}>Chicago Tracker</Text>
 
       <TextInput
@@ -56,6 +70,17 @@ const createStyles = (theme: any) =>
       justifyContent: "center",
       padding: 16,
     },
+    banner: {
+      position: "absolute",
+      top: 60,
+      left: 16,
+      right: 16,
+      backgroundColor: "#EF4444",
+      borderRadius: 10,
+      padding: 14,
+      alignItems: "center",
+    },
+    bannerText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
     title: {
       color: theme.accent,
       fontSize: 40,

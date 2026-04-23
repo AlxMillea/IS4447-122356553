@@ -4,9 +4,10 @@ import { useAppTheme } from "../state/theme-provider";
 
 type ProfileScreenProps = {
   onLogout: () => void;
+  onDeleteProfile: () => void;
 };
 
-export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
+export default function ProfileScreen({ onLogout, onDeleteProfile }: ProfileScreenProps) {
   const { theme } = useAppTheme();
   const styles = createStyles(theme);
 
@@ -32,6 +33,9 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
 
       <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
         <Text style={styles.logoutButtonText}>Logout</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.deleteButton} onPress={onDeleteProfile}>
+        <Text style={styles.deleteButtonText}>Delete Profile</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -106,6 +110,16 @@ const createStyles = (theme: any) =>
       alignItems: "center",
       borderWidth: 1,
       borderColor: theme.accent,
+      marginBottom: 10,
     },
     logoutButtonText: { color: theme.accent, fontWeight: "700", fontSize: 16 },
+    deleteButton: {
+      backgroundColor: theme.surface,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: "#EF4444",
+    },
+    deleteButtonText: { color: "#EF4444", fontWeight: "700", fontSize: 16 },
   });

@@ -15,6 +15,7 @@ import {
   formatDayMonthYear,
   getHabitLogsByHabitIds,
   getHabitsByNames,
+  getStreaks,
   getTargetsWithHabits,
   insertLogAtDate,
   updateLog,
@@ -62,6 +63,8 @@ export default function HomeOverviewScreen() {
     footballDone: 0, footballTarget: 5,
     proteinDone: 0, proteinTarget: 35,
   });
+
+  const [streaks, setStreaks] = useState({ protein: 0, gym: 0 });
 
   // Store habitIds and existing logs for upserts
   const [habitIds, setHabitIds] = useState<Record<string, number>>({});
@@ -134,6 +137,7 @@ export default function HomeOverviewScreen() {
     const footballDone = allLogs.filter((l) => l.habitId === ids["Football Session"] && l.value >= 1).length;
     const proteinDone = new Set(allLogs.filter((l) => l.habitId === ids["Hit 185g Protein"] && l.value >= 185).map((l) => l.date)).size;
     setGlobalTargets({ gymDone, gymTarget, footballDone, footballTarget, proteinDone, proteinTarget });
+    setStreaks(await getStreaks());
   }, []);
 
   useFocusEffect(useCallback(() => { void loadDashboard(); }, [loadDashboard]));
@@ -363,6 +367,26 @@ export default function HomeOverviewScreen() {
           </View>
         </View>
 
+        {/* ── STREAKS ── */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Current Streaks</Text>
+          <View style={styles.streakRow}>
+            <View style={styles.streakItem}>
+              <Text style={[styles.streakNum, streaks.protein > 0 && { color: theme.accent }]}>
+                {streaks.protein}
+              </Text>
+              <Text style={styles.streakLabel}>day protein{"\n"}streak</Text>
+            </View>
+            <View style={[styles.streakDivider, { backgroundColor: theme.border }]} />
+            <View style={styles.streakItem}>
+              <Text style={[styles.streakNum, streaks.gym > 0 && { color: theme.accent }]}>
+                {streaks.gym}
+              </Text>
+              <Text style={styles.streakLabel}>day gym{"\n"}streak</Text>
+            </View>
+          </View>
+        </View>
+
         {/* ── GLOBAL GOALS ── */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>7-Week Goals</Text>
@@ -476,6 +500,13 @@ const createStyles = (theme: any) =>
     suppChipActive: { backgroundColor: theme.accent, borderColor: theme.accent },
     suppText: { color: theme.textSecondary, fontWeight: "600", fontSize: 13 },
     suppTextActive: { color: "#FFFFFF" },
+
+    // Streaks
+    streakRow: { flexDirection: "row", alignItems: "center", marginTop: 10 },
+    streakItem: { flex: 1, alignItems: "center" },
+    streakNum: { fontSize: 40, fontWeight: "900", color: theme.textSecondary, lineHeight: 44 },
+    streakLabel: { color: theme.textSecondary, fontSize: 12, textAlign: "center", marginTop: 2 },
+    streakDivider: { width: 1, height: 56, marginHorizontal: 16 },
 
     // CTAs
     logBtn: { backgroundColor: theme.accent, borderRadius: 12, paddingVertical: 18, alignItems: "center", marginBottom: 10 },

@@ -331,6 +331,40 @@ export async function getRecordHistory(): Promise<RecordHistoryRow[]> {
     .orderBy(desc(habitLogs.id));
 }
 
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function calcStreak(metDates: Set<string>): number {
+  if (!metDates.size) return 0;
+  let cursor = startOfDay(new Date());
+  if (!metDates.has(formatDayMonthYear(cursor))) {
+    cursor = new Date(cursor.getTime() - 86400000);
+  }
+  let streak = 0;
+  while (metDates.has(formatDayMonthYear(cursor))) {
+    streak++;
+    cursor = new Date(cursor.getTime() - 86400000);
+  }
+  return streak;
+}
+
+export async function getStreaks(): Promise<{ protein: number; gym: number }> {
+  const habitList = await getHabitsByNames(["Hit 185g Protein", "Gym Session"]);
+  const idMap = Object.fromEntries(habitList.map((h) => [h.name, h.id]));
+  const allLogs = await getHabitLogsByHabitIds(habitList.map((h) => h.id));
+
+  const proteinMet = new Set<string>();
+  const gymMet = new Set<string>();
+
+  for (const log of allLogs) {
+    if (log.habitId === idMap["Hit 185g Protein"] && log.value >= 185) proteinMet.add(log.date);
+    if (log.habitId === idMap["Gym Session"] && log.value >= 1) gymMet.add(log.date);
+  }
+
+  return { protein: calcStreak(proteinMet), gym: calcStreak(gymMet) };
+}
+
 function csvEscape(value: unknown): string {
   const s = String(value ?? "");
   if (s.includes(",") || s.includes('"') || s.includes("\n")) {

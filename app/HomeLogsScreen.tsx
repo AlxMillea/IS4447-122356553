@@ -4,6 +4,7 @@ import { Settings } from "lucide-react-native";
 import { useCallback } from "react";
 import { TouchableOpacity } from "react-native";
 import { useAppTheme } from "../state/theme-provider";
+import ChicagoHeaderTitle from "./ChicagoHeaderTitle";
 import DailyLogScreen from "./DailyLogScreen";
 import HomeOverviewScreen from "./HomeOverviewScreen";
 
@@ -34,7 +35,8 @@ export default function HomeLogsScreen() {
         name="HomeOverview"
         component={HomeOverviewScreen}
         options={{
-          title: "Home",
+          headerTitle: () => <ChicagoHeaderTitle />,
+          headerTitleAlign: "left",
           headerRight: () => (
             <TouchableOpacity onPress={goToSettings} style={{ marginRight: 4 }}>
               <Settings size={22} color={theme.textPrimary} />

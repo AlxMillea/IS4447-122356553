@@ -15,6 +15,7 @@ import "react-native-reanimated";
 import { runDbHealthcheck } from "../db/healthcheck";
 import { seedIfEmpty } from "../db/seed";
 import { AppThemeProvider, useAppTheme } from "../state/theme-provider";
+import ChicagoHeaderTitle from "./ChicagoHeaderTitle";
 import HomeLogsScreen from "./HomeLogsScreen";
 import InsightsScreen from "./InsightsScreen";
 import LoginPage from "./LoginPage";
@@ -25,13 +26,15 @@ import TargetsScreen from "./TargetsScreen";
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
 
-function MainTabs({ onLogout }: { onLogout: () => void }) {
+function MainTabs({ onLogout, onDeleteProfile }: { onLogout: () => void; onDeleteProfile: () => void }) {
   const { theme } = useAppTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route, navigation }) => ({
         headerStyle: { backgroundColor: theme.background },
         headerTintColor: theme.textPrimary,
+        headerTitleAlign: "left",
+        headerTitle: () => <ChicagoHeaderTitle />,
         tabBarStyle: {
           backgroundColor: theme.surface,
           borderTopColor: theme.border,
@@ -59,7 +62,7 @@ function MainTabs({ onLogout }: { onLogout: () => void }) {
       <Tab.Screen name="Targets" component={TargetsScreen} />
       <Tab.Screen name="Insights" component={InsightsScreen} />
       <Tab.Screen name="Profile">
-        {() => <ProfileScreen onLogout={onLogout} />}
+        {() => <ProfileScreen onLogout={onLogout} onDeleteProfile={onDeleteProfile} />}
       </Tab.Screen>
     </Tab.Navigator>
   );
@@ -68,9 +71,16 @@ function MainTabs({ onLogout }: { onLogout: () => void }) {
 function AppContent() {
   const { theme, mode } = useAppTheme();
   const [isEntered, setIsEntered] = useState(false);
+  const [showDeletedBanner, setShowDeletedBanner] = useState(false);
 
   if (!isEntered) {
-    return <LoginPage onEnter={() => setIsEntered(true)} />;
+    return (
+      <LoginPage
+        onEnter={() => setIsEntered(true)}
+        showDeletedBanner={showDeletedBanner}
+        onBannerDismissed={() => setShowDeletedBanner(false)}
+      />
+    );
   }
 
   const navTheme =
@@ -103,7 +113,7 @@ function AppContent() {
       <NavigationContainer theme={navTheme}>
         <RootStack.Navigator>
           <RootStack.Screen name="MainTabs" options={{ headerShown: false }}>
-            {() => <MainTabs onLogout={() => setIsEntered(false)} />}
+            {() => <MainTabs onLogout={() => setIsEntered(false)} onDeleteProfile={() => { setShowDeletedBanner(true); setIsEntered(false); }} />}
           </RootStack.Screen>
           <RootStack.Screen
             name="Settings"
