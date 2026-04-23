@@ -20,16 +20,27 @@ To use app:
 GitHub Repo:
 https://github.com/AlxMillea/IS4447-122356553
 
-There is 9 branches and 10 commits accross a month 
+There is 9 branches and 11 commits across a month 
 
-Expo Links: 
 
+
+
+iPhone Expo Links: 
 Update details page URL:
-https://expo.dev/preview/update?message=Final+submission+iOS&updateRuntimeVersion=1.0.0&createdAt=2026-04-23T15%3A38%3A36.986Z&slug=exp&projectId=f746f00a-9ad6-46b6-96bf-b4ab2e5802f5&group=1b46bc1a-86fb-4133-ba61-2baac87f4f69
+https://expo.dev/preview/update?message=Very+Final+submission+iOS&updateRuntimeVersion=1.0.0&createdAt=2026-04-23T16%3A47%3A05.195Z&slug=exp&projectId=f746f00a-9ad6-46b6-96bf-b4ab2e5802f5&group=41cc603c-5d0f-45e5-83ab-96de7436dc3f 
 
 Update deep link URL:
-exp://u.expo.dev/f746f00a-9ad6-46b6-96bf-b4ab2e5802f5/group/1b46bc1a-86fb-4133-ba61-2baac87f4f69 
+exp://u.expo.dev/f746f00a-9ad6-46b6-96bf-b4ab2e5802f5/group/41cc603c-5d0f-45e5-83ab-96de7436dc3f   
 
-QR Code:
-![alt text](<Screenshot 2026-04-23 at 16.43.05.png>)
+![alt text](<Screenshot 2026-04-23 at 17.53.47.png>)
 
+
+
+Android Expo Links:
+Update details page URL:
+https://expo.dev/preview/update?message=Final+submission+Android&updateRuntimeVersion=1.0.0&createdAt=2026-04-23T16%3A44%3A26.437Z&slug=exp&projectId=f746f00a-9ad6-46b6-96bf-b4ab2e5802f5&group=80827061-2981-4a53-9636-c124dbe49b8e 
+
+Update deep link URL:
+exp://u.expo.dev/f746f00a-9ad6-46b6-96bf-b4ab2e5802f5/group/80827061-2981-4a53-9636-c124dbe49b8e  
+
+![alt text](<Screenshot 2026-04-23 at 17.53.09.png>)
