@@ -1,11 +1,11 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import {
   DarkTheme,
   DefaultTheme,
   NavigationContainer,
   NavigationIndependentTree,
 } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import { ChartLine, House, Settings, Target, User } from "lucide-react-native";
 import { useEffect, useState } from "react";
@@ -26,7 +26,13 @@ import TargetsScreen from "./TargetsScreen";
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
 
-function MainTabs({ onLogout, onDeleteProfile }: { onLogout: () => void; onDeleteProfile: () => void }) {
+function MainTabs({
+  onLogout,
+  onDeleteProfile,
+}: {
+  onLogout: () => void;
+  onDeleteProfile: () => void;
+}) {
   const { theme } = useAppTheme();
   return (
     <Tab.Navigator
@@ -35,6 +41,14 @@ function MainTabs({ onLogout, onDeleteProfile }: { onLogout: () => void; onDelet
         headerTintColor: theme.textPrimary,
         headerTitleAlign: "left",
         headerTitle: () => <ChicagoHeaderTitle />,
+        headerTitleContainerStyle: {
+          marginLeft: 0,
+          paddingLeft: 0,
+          alignItems: "flex-start",
+          flex: 1,
+        },
+        headerLeftContainerStyle: { paddingLeft: 0 },
+        headerTitleStyle: { textAlign: "left" },
         tabBarStyle: {
           backgroundColor: theme.surface,
           borderTopColor: theme.border,
@@ -43,14 +57,19 @@ function MainTabs({ onLogout, onDeleteProfile }: { onLogout: () => void; onDelet
         tabBarInactiveTintColor: theme.textSecondary,
         tabBarIcon: ({ color, size }) => {
           if (route.name === "Home") return <House size={size} color={color} />;
-          if (route.name === "Targets") return <Target size={size} color={color} />;
-          if (route.name === "Insights") return <ChartLine size={size} color={color} />;
-          if (route.name === "Profile") return <User size={size} color={color} />;
+          if (route.name === "Targets")
+            return <Target size={size} color={color} />;
+          if (route.name === "Insights")
+            return <ChartLine size={size} color={color} />;
+          if (route.name === "Profile")
+            return <User size={size} color={color} />;
           return null;
         },
         headerRight: () => (
           <TouchableOpacity
-            onPress={() => navigation.getParent()?.navigate("Settings" as never)}
+            onPress={() =>
+              navigation.getParent()?.navigate("Settings" as never)
+            }
             style={{ marginRight: 16 }}
           >
             <Settings size={22} color={theme.textPrimary} />
@@ -58,11 +77,19 @@ function MainTabs({ onLogout, onDeleteProfile }: { onLogout: () => void; onDelet
         ),
       })}
     >
-      <Tab.Screen name="Home" component={HomeLogsScreen} options={{ headerShown: false }} />
+      <Tab.Screen
+        name="Home"
+        component={HomeLogsScreen}
+      />
       <Tab.Screen name="Targets" component={TargetsScreen} />
       <Tab.Screen name="Insights" component={InsightsScreen} />
       <Tab.Screen name="Profile">
-        {() => <ProfileScreen onLogout={onLogout} onDeleteProfile={onDeleteProfile} />}
+        {() => (
+          <ProfileScreen
+            onLogout={onLogout}
+            onDeleteProfile={onDeleteProfile}
+          />
+        )}
       </Tab.Screen>
     </Tab.Navigator>
   );
@@ -113,7 +140,15 @@ function AppContent() {
       <NavigationContainer theme={navTheme}>
         <RootStack.Navigator>
           <RootStack.Screen name="MainTabs" options={{ headerShown: false }}>
-            {() => <MainTabs onLogout={() => setIsEntered(false)} onDeleteProfile={() => { setShowDeletedBanner(true); setIsEntered(false); }} />}
+            {() => (
+              <MainTabs
+                onLogout={() => setIsEntered(false)}
+                onDeleteProfile={() => {
+                  setShowDeletedBanner(true);
+                  setIsEntered(false);
+                }}
+              />
+            )}
           </RootStack.Screen>
           <RootStack.Screen
             name="Settings"

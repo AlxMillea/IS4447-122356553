@@ -66,7 +66,6 @@ const createStyles = (theme: any) =>
     avatarCircle: {
       width: 96,
       height: 96,
-      borderRadius: 48,
       backgroundColor: theme.surface,
       borderWidth: 2,
       borderColor: theme.accent,
@@ -82,7 +81,6 @@ const createStyles = (theme: any) =>
     },
     card: {
       backgroundColor: theme.surface,
-      borderRadius: 12,
       padding: 16,
       marginBottom: 24,
       borderWidth: 1,
@@ -90,9 +88,11 @@ const createStyles = (theme: any) =>
     },
     cardTitle: {
       color: theme.accent,
-      fontWeight: "700",
-      fontSize: 16,
+      fontWeight: "500",
+      fontSize: 11,
       marginBottom: 12,
+      textTransform: "uppercase",
+      letterSpacing: 1.5,
     },
     row: {
       flexDirection: "row",
@@ -105,7 +105,6 @@ const createStyles = (theme: any) =>
     rowValue: { color: theme.textPrimary, fontSize: 14, fontWeight: "600" },
     logoutButton: {
       backgroundColor: theme.surface,
-      borderRadius: 10,
       paddingVertical: 14,
       alignItems: "center",
       borderWidth: 1,
@@ -115,7 +114,6 @@ const createStyles = (theme: any) =>
     logoutButtonText: { color: theme.accent, fontWeight: "700", fontSize: 16 },
     deleteButton: {
       backgroundColor: theme.surface,
-      borderRadius: 10,
       paddingVertical: 14,
       alignItems: "center",
       borderWidth: 1,

@@ -217,6 +217,13 @@ export default function HevyImport() {
     });
   };
 
+  const onClear = async () => {
+    await AsyncStorage.multiRemove([KEY_WORKOUTS, KEY_MEASUREMENTS]);
+    setWorkouts([]);
+    setMeasurements([]);
+    setStatus("Data cleared.");
+  };
+
   const onImport = async () => {
     try {
       setLoading(true);
@@ -263,11 +270,18 @@ export default function HevyImport() {
               : "Export CSV from Hevy app and import here"}
           </Text>
         </View>
-        <TouchableOpacity style={[styles.importBtn, { backgroundColor: theme.accent }]} onPress={onImport} disabled={loading}>
-          {loading
-            ? <ActivityIndicator color="#fff" size="small" />
-            : <><Upload size={14} color="#fff" /><Text style={styles.importBtnText}>Import CSV</Text></>}
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          {(workouts.length > 0 || measurements.length > 0) && (
+            <TouchableOpacity style={[styles.importBtn, { backgroundColor: "#B91C1C" }]} onPress={onClear}>
+              <Text style={styles.importBtnText}>Clear</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={[styles.importBtn, { backgroundColor: theme.accent }]} onPress={onImport} disabled={loading}>
+            {loading
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <><Upload size={14} color="#fff" /><Text style={styles.importBtnText}>Import CSV</Text></>}
+          </TouchableOpacity>
+        </View>
       </View>
       {!!status && <Text style={[styles.statusText, { color: theme.accent }]}>{status}</Text>}
 
@@ -361,18 +375,18 @@ const createStyles = (theme: any) =>
     importRow: { flexDirection: "row", alignItems: "center", gap: 12 },
     sectionTitle: { color: theme.textPrimary, fontWeight: "700", fontSize: 15 },
     sectionSub: { color: theme.textSecondary, fontSize: 12, marginTop: 2 },
-    importBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 14 },
+    importBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 10, paddingHorizontal: 14 },
     importBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
     statusText: { fontSize: 12, marginTop: 8 },
-    card: { backgroundColor: theme.surface, borderRadius: 10, padding: 12, overflow: "hidden" },
-    cardTitle: { color: theme.textPrimary, fontWeight: "700", fontSize: 14, marginBottom: 10 },
+    card: { backgroundColor: theme.surface, padding: 12, overflow: "hidden" },
+    cardTitle: { color: theme.textPrimary, fontWeight: "500", fontSize: 11, marginBottom: 10, textTransform: "uppercase", letterSpacing: 1.5 },
     tableHeader: { flexDirection: "row", marginBottom: 4, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: theme.border },
     tableHeaderText: { color: theme.textSecondary, fontWeight: "700", fontSize: 11 },
-    tableRow: { flexDirection: "row", paddingVertical: 6, borderRadius: 4 },
+    tableRow: { flexDirection: "row", paddingVertical: 6 },
     tableCell: { flex: 1, fontSize: 12, color: theme.textSecondary },
     tableCellDate: { flex: 1.4 },
-    sectionLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 8 },
-    sessionCard: { backgroundColor: theme.surface, borderRadius: 10, marginBottom: 8, overflow: "hidden" },
+    sectionLabel: { fontSize: 11, fontWeight: "500", letterSpacing: 1.5, marginBottom: 8, textTransform: "uppercase" },
+    sessionCard: { backgroundColor: theme.surface, marginBottom: 8, overflow: "hidden" },
     sessionHeader: { flexDirection: "row", alignItems: "flex-start", padding: 14, gap: 8 },
     sessionTitle: { color: theme.textPrimary, fontWeight: "700", fontSize: 14 },
     sessionMeta: { flexDirection: "row", flexWrap: "wrap", marginTop: 3 },
@@ -384,7 +398,7 @@ const createStyles = (theme: any) =>
     exerciseName: { color: theme.textPrimary, fontWeight: "600", fontSize: 13, marginBottom: 2 },
     exerciseNotes: { color: theme.textSecondary, fontSize: 11, fontStyle: "italic", marginBottom: 4 },
     setsRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 4 },
-    setBadge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+    setBadge: { borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
     setBadgeFailure: { backgroundColor: "#FEF2F2" },
     setText: { color: theme.textSecondary, fontSize: 11, fontWeight: "500" },
   });

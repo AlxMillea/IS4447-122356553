@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -34,7 +35,13 @@ export default function LoginPage({ onEnter, showDeletedBanner, onBannerDismisse
         </View>
       )}
 
-      <Text style={styles.title}>Chicago Tracker</Text>
+      <Text style={styles.title}>Habit Tracker for Chicago Trip</Text>
+
+      <Image
+        source={require("../assets/images/ChicagoImage.jpg")}
+        style={styles.skyline}
+        resizeMode="contain"
+      />
 
       <TextInput
         style={styles.input}
@@ -66,7 +73,7 @@ const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.background,
+      backgroundColor: "#FFFFFF",
       justifyContent: "center",
       padding: 16,
     },
@@ -76,16 +83,18 @@ const createStyles = (theme: any) =>
       left: 16,
       right: 16,
       backgroundColor: "#EF4444",
-      borderRadius: 10,
       padding: 14,
       alignItems: "center",
     },
     bannerText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
     title: {
       color: theme.accent,
-      fontSize: 40,
-      fontWeight: "900",
+      fontSize: 38,
+      fontWeight: "400",
+      fontStyle: "italic",
+      fontFamily: "Georgia",
       textAlign: "center",
+      letterSpacing: 1,
       marginBottom: 6,
     },
     input: {
@@ -93,16 +102,15 @@ const createStyles = (theme: any) =>
       color: theme.textPrimary,
       borderColor: theme.border,
       borderWidth: 1,
-      borderRadius: 8,
       padding: 12,
       marginBottom: 10,
     },
     button: {
       backgroundColor: theme.accent,
-      borderRadius: 8,
       paddingVertical: 12,
       alignItems: "center",
       marginBottom: 10,
     },
     buttonText: { color: "#FFFFFF", fontWeight: "800" },
+    skyline: { width: "100%", height: 160, marginBottom: 24 },
   });

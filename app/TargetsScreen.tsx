@@ -157,7 +157,7 @@ export default function TargetsScreen() {
         const todayStr = new Date().toISOString().split("T")[0];
         const statusColor =
           week.status === "done" ? "#22C55E" :
-          week.status === "current" ? "#3B82F6" :
+          week.status === "current" ? theme.accent :
           theme.textSecondary;
         const statusLabel =
           week.status === "done" ? "done" :
@@ -169,7 +169,7 @@ export default function TargetsScreen() {
             key={week.num}
             style={[
               styles.weekCard,
-              week.status === "current" && { borderColor: "#3B82F6", borderWidth: 1.5 },
+              week.status === "current" && { borderColor: theme.accent, borderWidth: 1.5 },
             ]}
           >
             <TouchableOpacity style={styles.weekHeader} onPress={() => toggleWeek(week.num)} activeOpacity={0.7}>
@@ -310,25 +310,25 @@ const createStyles = (theme: any) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background },
     statsRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
-    statCard: { flex: 1, backgroundColor: theme.surface, borderRadius: 12, padding: 14 },
-    statLabel: { color: theme.textSecondary, fontSize: 11, marginBottom: 4 },
+    statCard: { flex: 1, backgroundColor: theme.surface, padding: 14 },
+    statLabel: { color: theme.textSecondary, fontSize: 11, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 },
     statValue: { color: theme.textPrimary, fontSize: 32, fontWeight: "700", letterSpacing: -1, marginBottom: 2 },
     statSub: { color: theme.textSecondary, fontSize: 11 },
     progressLabel: { color: theme.textSecondary, fontSize: 12 },
-    track: { height: 8, backgroundColor: theme.border, borderRadius: 6, overflow: "hidden" },
-    fill: { height: 8, backgroundColor: "#3B82F6", borderRadius: 6 },
+    track: { height: 8, backgroundColor: theme.border, overflow: "hidden" },
+    fill: { height: 8, backgroundColor: theme.accent },
     sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-    sectionHeaderText: { color: theme.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1 },
+    sectionHeaderText: { color: theme.textSecondary, fontSize: 11, fontWeight: "500", letterSpacing: 1.5, textTransform: "uppercase" },
     chevron: { fontSize: 10 },
-    prRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, backgroundColor: theme.surface, borderRadius: 8, padding: 12, marginBottom: 6 },
-    prDot: { width: 7, height: 7, borderRadius: 4, marginTop: 5 },
+    prRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, backgroundColor: theme.surface, padding: 12, marginBottom: 6 },
+    prDot: { width: 7, height: 7, marginTop: 5 },
     prText: { color: theme.textPrimary, fontSize: 13, flex: 1 },
-    weekByWeekLabel: { color: theme.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 10 },
-    weekCard: { backgroundColor: theme.surface, borderRadius: 12, marginBottom: 10, overflow: "hidden" },
+    weekByWeekLabel: { color: theme.textSecondary, fontSize: 11, fontWeight: "500", letterSpacing: 1.5, marginBottom: 10, textTransform: "uppercase" },
+    weekCard: { backgroundColor: theme.surface, marginBottom: 10, overflow: "hidden" },
     weekHeader: { flexDirection: "row", alignItems: "center", padding: 16 },
     weekTitle: { color: theme.textPrimary, fontSize: 15, fontWeight: "700" },
     weekSub: { color: theme.textSecondary, fontSize: 12, marginTop: 2 },
-    statusBadge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+    statusBadge: { borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
     statusText: { fontSize: 11, fontWeight: "600" },
     dayRow: { flexDirection: "row", alignItems: "flex-start", paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: theme.border },
     dayDateCol: { width: 36, marginRight: 12 },
@@ -336,17 +336,17 @@ const createStyles = (theme: any) =>
     dayNum: { fontSize: 15, fontWeight: "700" },
     sessionText: { color: theme.textPrimary, fontSize: 13, fontWeight: "600" },
     restText: { color: theme.textSecondary, fontSize: 13, fontStyle: "italic" },
-    tag: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
+    tag: { paddingHorizontal: 7, paddingVertical: 2 },
     tagText: { fontSize: 10, fontWeight: "600" },
     dayNotes: { color: theme.textSecondary, fontSize: 11, marginTop: 3, lineHeight: 15 },
     editHint: { fontSize: 18, marginLeft: 8, alignSelf: "center" },
     modalTitle: { fontSize: 20, fontWeight: "700", marginBottom: 12 },
     modalLabel: { fontSize: 12, marginBottom: 4, marginTop: 12 },
-    modalInput: { borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 14, marginBottom: 4 },
+    modalInput: { borderWidth: 1, padding: 10, fontSize: 14, marginBottom: 4 },
     modalSession: { fontSize: 16, fontWeight: "600", marginBottom: 10 },
     modalNotes: { fontSize: 14, lineHeight: 20 },
-    saveBtn: { borderRadius: 8, paddingVertical: 12, alignItems: "center", marginTop: 16 },
+    saveBtn: { paddingVertical: 12, alignItems: "center", marginTop: 16 },
     saveBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 15 },
-    cancelBtn: { borderRadius: 8, paddingVertical: 12, alignItems: "center" },
+    cancelBtn: { paddingVertical: 12, alignItems: "center" },
     cancelBtnText: { fontWeight: "600", fontSize: 15 },
   });

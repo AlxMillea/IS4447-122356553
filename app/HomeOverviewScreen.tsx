@@ -1,7 +1,7 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -43,10 +43,87 @@ const SUPPLEMENTS = [
 
 type DayType = "Gym" | "Football" | "Rest";
 
+function FlagProgressBar({
+  pct,
+  trackColor,
+  height = 28,
+  marginBottom = 12,
+}: {
+  pct: number;
+  trackColor: string;
+  height?: number;
+  marginBottom?: number;
+}) {
+  const stripeH = height / 13;
+  const cantonH = Math.ceil(7 * stripeH);
+  return (
+    <View
+      style={{
+        height,
+        width: "90%",
+        backgroundColor: trackColor,
+        overflow: "hidden",
+        marginBottom,
+      }}
+    >
+      <View
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: `${Math.max(0, pct)}%`,
+          overflow: "hidden",
+        }}
+      >
+        {Array.from({ length: 13 }, (_, i) => (
+          <View
+            key={i}
+            style={{
+              height: stripeH,
+              backgroundColor: i % 2 === 0 ? "#B22234" : "#FFFFFF",
+            }}
+          />
+        ))}
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            width: 44,
+            height: cantonH,
+            backgroundColor: "#3C3B6E",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Text
+            style={{
+              color: "#FFFFFF",
+              fontSize: 7,
+              letterSpacing: 2,
+              textAlign: "center",
+            }}
+          >
+            {"★★★\n★★★"}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function HomeOverviewScreen() {
   const { theme } = useAppTheme();
   const styles = createStyles(theme);
-  const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitleAlign: "left",
+    });
+  }, [navigation]);
 
   const [showMorningPulse, setShowMorningPulse] = useState(false);
   const [todayDate, setTodayDate] = useState("");
@@ -59,16 +136,21 @@ export default function HomeOverviewScreen() {
   const [showCustomProtein, setShowCustomProtein] = useState(false);
   const [showCustomWater, setShowCustomWater] = useState(false);
   const [globalTargets, setGlobalTargets] = useState({
-    gymDone: 0, gymTarget: 20,
-    footballDone: 0, footballTarget: 5,
-    proteinDone: 0, proteinTarget: 35,
+    gymDone: 0,
+    gymTarget: 20,
+    footballDone: 0,
+    footballTarget: 5,
+    proteinDone: 0,
+    proteinTarget: 35,
   });
 
   const [streaks, setStreaks] = useState({ protein: 0, gym: 0 });
 
   // Store habitIds and existing logs for upserts
   const [habitIds, setHabitIds] = useState<Record<string, number>>({});
-  const [existingByHabitId, setExistingByHabitId] = useState<Map<number, HabitLogRow>>(new Map());
+  const [existingByHabitId, setExistingByHabitId] = useState<
+    Map<number, HabitLogRow>
+  >(new Map());
 
   const daysUntilChicago = useMemo(() => {
     const diffMs = CHICAGO_TRIP_DATE.getTime() - new Date().getTime();
@@ -88,12 +170,21 @@ export default function HomeOverviewScreen() {
     setTodayDate(date);
 
     const habitNames = [
-      "Calories (Gym Day)", "Calories (Rest Day)", "Hit 185g Protein",
-      "Weigh-in", "Gym Session", "Football Session", "Log Sleep",
-      "Whoop Recovery %", "Water Intake (ml)",
+      "Calories (Gym Day)",
+      "Calories (Rest Day)",
+      "Hit 185g Protein",
+      "Weigh-in",
+      "Gym Session",
+      "Football Session",
+      "Log Sleep",
+      "Whoop Recovery %",
+      "Water Intake (ml)",
     ];
     const habits = await getHabitsByNames(habitNames);
-    const ids = Object.fromEntries(habits.map((h) => [h.name, h.id])) as Record<string, number>;
+    const ids = Object.fromEntries(habits.map((h) => [h.name, h.id])) as Record<
+      string,
+      number
+    >;
     setHabitIds(ids);
 
     const allLogs = await getHabitLogsByHabitIds(habits.map((h) => h.id));
@@ -122,7 +213,11 @@ export default function HomeOverviewScreen() {
     const calLog = gymCalLog ?? restCalLog;
     if (calLog?.notes) {
       const match = calLog.notes.match(/Supplements:([^|]+)/);
-      const supp = match?.[1]?.split(",").map((x) => x.trim()).filter((x) => x && x !== "None") ?? [];
+      const supp =
+        match?.[1]
+          ?.split(",")
+          .map((x) => x.trim())
+          .filter((x) => x && x !== "None") ?? [];
       setSelectedSupplements(supp);
     } else {
       setSelectedSupplements([]);
@@ -130,37 +225,72 @@ export default function HomeOverviewScreen() {
 
     // Global targets
     const targets = await getTargetsWithHabits();
-    const gymTarget = targets.find((t) => t.habitName === "Gym Session" && t.period === "global_5w")?.targetValue ?? 20;
-    const footballTarget = targets.find((t) => t.habitName === "Football Session" && t.period === "global_5w")?.targetValue ?? 5;
-    const proteinTarget = targets.find((t) => t.habitName === "Hit 185g Protein" && t.period === "global_5w")?.targetValue ?? 35;
-    const gymDone = allLogs.filter((l) => l.habitId === ids["Gym Session"] && l.value >= 1).length;
-    const footballDone = allLogs.filter((l) => l.habitId === ids["Football Session"] && l.value >= 1).length;
-    const proteinDone = new Set(allLogs.filter((l) => l.habitId === ids["Hit 185g Protein"] && l.value >= 185).map((l) => l.date)).size;
-    setGlobalTargets({ gymDone, gymTarget, footballDone, footballTarget, proteinDone, proteinTarget });
+    const gymTarget =
+      targets.find(
+        (t) => t.habitName === "Gym Session" && t.period === "global_5w",
+      )?.targetValue ?? 20;
+    const footballTarget =
+      targets.find(
+        (t) => t.habitName === "Football Session" && t.period === "global_5w",
+      )?.targetValue ?? 5;
+    const proteinTarget =
+      targets.find(
+        (t) => t.habitName === "Hit 185g Protein" && t.period === "global_5w",
+      )?.targetValue ?? 35;
+    const gymDone = allLogs.filter(
+      (l) => l.habitId === ids["Gym Session"] && l.value >= 1,
+    ).length;
+    const footballDone = allLogs.filter(
+      (l) => l.habitId === ids["Football Session"] && l.value >= 1,
+    ).length;
+    const proteinDone = new Set(
+      allLogs
+        .filter((l) => l.habitId === ids["Hit 185g Protein"] && l.value >= 185)
+        .map((l) => l.date),
+    ).size;
+    setGlobalTargets({
+      gymDone,
+      gymTarget,
+      footballDone,
+      footballTarget,
+      proteinDone,
+      proteinTarget,
+    });
     setStreaks(await getStreaks());
   }, []);
 
-  useFocusEffect(useCallback(() => { void loadDashboard(); }, [loadDashboard]));
+  useFocusEffect(
+    useCallback(() => {
+      void loadDashboard();
+    }, [loadDashboard]),
+  );
 
   // Generic upsert helper
-  const upsert = useCallback(async (habitName: string, value: number, notes?: string) => {
-    const habitId = habitIds[habitName];
-    if (!habitId) return;
-    const existing = existingByHabitId.get(habitId);
-    const date = formatDayMonthYear(new Date());
-    if (existing) {
-      await updateLog(existing.id, value, notes ?? existing.notes ?? undefined);
-      setExistingByHabitId((prev) => {
-        const next = new Map(prev);
-        next.set(habitId, { ...existing, value });
-        return next;
-      });
-    } else {
-      await insertLogAtDate(habitId, date, value, notes);
-      // Reload to capture new log ID
-      void loadDashboard();
-    }
-  }, [habitIds, existingByHabitId, loadDashboard]);
+  const upsert = useCallback(
+    async (habitName: string, value: number, notes?: string) => {
+      const habitId = habitIds[habitName];
+      if (!habitId) return;
+      const existing = existingByHabitId.get(habitId);
+      const date = formatDayMonthYear(new Date());
+      if (existing) {
+        await updateLog(
+          existing.id,
+          value,
+          notes ?? existing.notes ?? undefined,
+        );
+        setExistingByHabitId((prev) => {
+          const next = new Map(prev);
+          next.set(habitId, { ...existing, value });
+          return next;
+        });
+      } else {
+        await insertLogAtDate(habitId, date, value, notes);
+        // Reload to capture new log ID
+        void loadDashboard();
+      }
+    },
+    [habitIds, existingByHabitId, loadDashboard],
+  );
 
   const onAddProtein = async (amount: number) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -203,18 +333,23 @@ export default function HomeOverviewScreen() {
   const onToggleSupplement = async (supp: string) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedSupplements((prev) => {
-      const next = prev.includes(supp) ? prev.filter((x) => x !== supp) : [...prev, supp];
+      const next = prev.includes(supp)
+        ? prev.filter((x) => x !== supp)
+        : [...prev, supp];
       // Persist to existing calories log notes in background
       const gymHabitId = habitIds["Calories (Gym Day)"];
       const restHabitId = habitIds["Calories (Rest Day)"];
-      const calLog = existingByHabitId.get(gymHabitId) ?? existingByHabitId.get(restHabitId);
+      const calLog =
+        existingByHabitId.get(gymHabitId) ?? existingByHabitId.get(restHabitId);
       if (calLog) {
         const suppStr = next.length ? next.join(", ") : "None";
         let notes = calLog.notes ?? "";
         if (notes.includes("Supplements:")) {
           notes = notes.replace(/Supplements:[^|]+/, `Supplements:${suppStr}`);
         } else {
-          notes = notes ? `${notes} | Supplements:${suppStr}` : `Supplements:${suppStr}`;
+          notes = notes
+            ? `${notes} | Supplements:${suppStr}`
+            : `Supplements:${suppStr}`;
         }
         void updateLog(calLog.id, calLog.value, notes);
       }
@@ -229,7 +364,10 @@ export default function HomeOverviewScreen() {
     <SafeAreaView style={styles.safe}>
       <MorningPulseModal
         visible={showMorningPulse}
-        onClose={() => { setShowMorningPulse(false); void loadDashboard(); }}
+        onClose={() => {
+          setShowMorningPulse(false);
+          void loadDashboard();
+        }}
       />
 
       <ScrollView contentContainerStyle={styles.container}>
@@ -238,10 +376,15 @@ export default function HomeOverviewScreen() {
           <Text style={styles.countdownNumber}>{daysUntilChicago}</Text>
           <Text style={styles.countdownLabel}>Days to Chicago</Text>
           <Text style={styles.countdownSub}>{todayDate}</Text>
-          <View style={styles.phaseTrack}>
-            <View style={[styles.phaseFill, { width: `${phasePct}%` }]} />
-          </View>
-          <Text style={styles.phaseLabel}>{phasePct}% through 7-week phase</Text>
+          <FlagProgressBar
+            pct={phasePct}
+            trackColor={theme.surface}
+            height={24}
+            marginBottom={6}
+          />
+          <Text style={styles.phaseLabel}>
+            {phasePct}% through 7-week phase
+          </Text>
         </View>
 
         {/* ── DAY TYPE ── */}
@@ -257,7 +400,14 @@ export default function HomeOverviewScreen() {
                   setDayType(t);
                 }}
               >
-                <Text style={[styles.segText, dayType === t && styles.segTextActive]}>{t}</Text>
+                <Text
+                  style={[
+                    styles.segText,
+                    dayType === t && styles.segTextActive,
+                  ]}
+                >
+                  {t}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -268,22 +418,34 @@ export default function HomeOverviewScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Protein</Text>
-            <Text style={[styles.stepperValue, proteinG >= PROTEIN_TARGET && styles.stepperValueDone]}>
+            <Text
+              style={[
+                styles.stepperValue,
+                proteinG >= PROTEIN_TARGET && styles.stepperValueDone,
+              ]}
+            >
               {Math.round(proteinG)}g / {PROTEIN_TARGET}g
             </Text>
           </View>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${proteinPct}%` }, proteinG >= PROTEIN_TARGET && styles.progressFillDone]} />
-          </View>
+          <FlagProgressBar pct={proteinPct} trackColor={theme.background} />
           <View style={styles.stepperRow}>
-            <TouchableOpacity style={styles.stepBtn} onPress={() => onAddProtein(25)}>
+            <TouchableOpacity
+              style={styles.stepBtn}
+              onPress={() => onAddProtein(25)}
+            >
               <Text style={styles.stepBtnText}>+25g</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.stepBtn} onPress={() => onAddProtein(40)}>
+            <TouchableOpacity
+              style={styles.stepBtn}
+              onPress={() => onAddProtein(40)}
+            >
               <Text style={styles.stepBtnText}>+40g</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.stepBtn, showCustomProtein && styles.stepBtnActive]}
+              style={[
+                styles.stepBtn,
+                showCustomProtein && styles.stepBtnActive,
+              ]}
               onPress={() => setShowCustomProtein((v) => !v)}
             >
               <Text style={styles.stepBtnText}>Custom</Text>
@@ -299,7 +461,10 @@ export default function HomeOverviewScreen() {
                 placeholderTextColor={theme.textSecondary}
                 keyboardType="numeric"
               />
-              <TouchableOpacity style={styles.customAddBtn} onPress={onCustomProtein}>
+              <TouchableOpacity
+                style={styles.customAddBtn}
+                onPress={onCustomProtein}
+              >
                 <Text style={styles.customAddBtnText}>Add</Text>
               </TouchableOpacity>
             </View>
@@ -310,18 +475,27 @@ export default function HomeOverviewScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Water</Text>
-            <Text style={[styles.stepperValue, waterMl >= WATER_TARGET && styles.stepperValueDone]}>
+            <Text
+              style={[
+                styles.stepperValue,
+                waterMl >= WATER_TARGET && styles.stepperValueDone,
+              ]}
+            >
               {Math.round(waterMl)}ml / {WATER_TARGET}ml
             </Text>
           </View>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${waterPct}%` }, waterMl >= WATER_TARGET && styles.progressFillDone]} />
-          </View>
+          <FlagProgressBar pct={waterPct} trackColor={theme.background} />
           <View style={styles.stepperRow}>
-            <TouchableOpacity style={styles.stepBtn} onPress={() => onAddWater(250)}>
+            <TouchableOpacity
+              style={styles.stepBtn}
+              onPress={() => onAddWater(250)}
+            >
               <Text style={styles.stepBtnText}>+250ml</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.stepBtn} onPress={() => onAddWater(500)}>
+            <TouchableOpacity
+              style={styles.stepBtn}
+              onPress={() => onAddWater(500)}
+            >
               <Text style={styles.stepBtnText}>+500ml</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -341,7 +515,10 @@ export default function HomeOverviewScreen() {
                 placeholderTextColor={theme.textSecondary}
                 keyboardType="numeric"
               />
-              <TouchableOpacity style={styles.customAddBtn} onPress={onCustomWater}>
+              <TouchableOpacity
+                style={styles.customAddBtn}
+                onPress={onCustomWater}
+              >
                 <Text style={styles.customAddBtnText}>Add</Text>
               </TouchableOpacity>
             </View>
@@ -360,7 +537,11 @@ export default function HomeOverviewScreen() {
                   style={[styles.suppChip, active && styles.suppChipActive]}
                   onPress={() => onToggleSupplement(supp)}
                 >
-                  <Text style={[styles.suppText, active && styles.suppTextActive]}>{supp}</Text>
+                  <Text
+                    style={[styles.suppText, active && styles.suppTextActive]}
+                  >
+                    {supp}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -372,14 +553,26 @@ export default function HomeOverviewScreen() {
           <Text style={styles.cardTitle}>Current Streaks</Text>
           <View style={styles.streakRow}>
             <View style={styles.streakItem}>
-              <Text style={[styles.streakNum, streaks.protein > 0 && { color: theme.accent }]}>
+              <Text
+                style={[
+                  styles.streakNum,
+                  streaks.protein > 0 && { color: theme.accent },
+                ]}
+              >
                 {streaks.protein}
               </Text>
               <Text style={styles.streakLabel}>day protein{"\n"}streak</Text>
             </View>
-            <View style={[styles.streakDivider, { backgroundColor: theme.border }]} />
+            <View
+              style={[styles.streakDivider, { backgroundColor: theme.border }]}
+            />
             <View style={styles.streakItem}>
-              <Text style={[styles.streakNum, streaks.gym > 0 && { color: theme.accent }]}>
+              <Text
+                style={[
+                  styles.streakNum,
+                  streaks.gym > 0 && { color: theme.accent },
+                ]}
+              >
                 {streaks.gym}
               </Text>
               <Text style={styles.streakLabel}>day gym{"\n"}streak</Text>
@@ -394,30 +587,33 @@ export default function HomeOverviewScreen() {
             label="Gym Sessions"
             done={globalTargets.gymDone}
             target={globalTargets.gymTarget}
-            accentColor={theme.accent}
             textSecondary={theme.textSecondary}
             textPrimary={theme.textPrimary}
+            trackColor={theme.border}
           />
           <GoalRow
             label="Football Sessions"
             done={globalTargets.footballDone}
             target={globalTargets.footballTarget}
-            accentColor={theme.accent}
             textSecondary={theme.textSecondary}
             textPrimary={theme.textPrimary}
+            trackColor={theme.border}
           />
           <GoalRow
             label="Protein Days ≥185g"
             done={globalTargets.proteinDone}
             target={globalTargets.proteinTarget}
-            accentColor={theme.accent}
             textSecondary={theme.textSecondary}
             textPrimary={theme.textPrimary}
+            trackColor={theme.border}
           />
         </View>
 
         {/* ── CTA ── */}
-        <TouchableOpacity style={styles.logBtn} onPress={() => navigation.navigate("DailyLog")}>
+        <TouchableOpacity
+          style={styles.logBtn}
+          onPress={() => navigation.navigate("DailyLog")}
+        >
           <Text style={styles.logBtnText}>Log Today</Text>
         </TouchableOpacity>
 
@@ -433,21 +629,41 @@ export default function HomeOverviewScreen() {
 }
 
 function GoalRow({
-  label, done, target, accentColor, textSecondary, textPrimary,
+  label,
+  done,
+  target,
+  textSecondary,
+  textPrimary,
+  trackColor,
 }: {
-  label: string; done: number; target: number;
-  accentColor: string; textSecondary: string; textPrimary: string;
+  label: string;
+  done: number;
+  target: number;
+  textSecondary: string;
+  textPrimary: string;
+  trackColor: string;
 }) {
   const pct = Math.min(100, (done / target) * 100);
   return (
     <View style={{ marginBottom: 10 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          marginBottom: 4,
+        }}
+      >
         <Text style={{ color: textPrimary, fontSize: 13 }}>{label}</Text>
-        <Text style={{ color: textSecondary, fontSize: 13 }}>{done}/{target}</Text>
+        <Text style={{ color: textSecondary, fontSize: 13 }}>
+          {done}/{target}
+        </Text>
       </View>
-      <View style={{ height: 6, backgroundColor: "#333333", borderRadius: 3, overflow: "hidden" }}>
-        <View style={{ height: 6, width: `${pct}%`, backgroundColor: accentColor, borderRadius: 3 }} />
-      </View>
+      <FlagProgressBar
+        pct={pct}
+        trackColor={trackColor}
+        height={20}
+        marginBottom={0}
+      />
     </View>
   );
 }
@@ -458,59 +674,163 @@ const createStyles = (theme: any) =>
     container: { padding: 16, paddingBottom: 40 },
 
     // Countdown
-    countdownSection: { alignItems: "center", marginBottom: 20, paddingVertical: 8 },
-    countdownNumber: { color: theme.accent, fontSize: 80, fontWeight: "900", lineHeight: 84 },
-    countdownLabel: { color: theme.accent, fontSize: 22, fontWeight: "800", marginBottom: 4 },
-    countdownSub: { color: theme.textSecondary, fontSize: 13, marginBottom: 12 },
-    phaseTrack: { width: "100%", height: 8, backgroundColor: theme.surface, borderRadius: 4, overflow: "hidden", marginBottom: 4 },
-    phaseFill: { height: 8, backgroundColor: theme.accent, borderRadius: 4 },
+    countdownSection: {
+      alignItems: "center",
+      marginBottom: 20,
+      paddingVertical: 8,
+    },
+    countdownNumber: {
+      color: theme.accent,
+      fontSize: 80,
+      fontWeight: "900",
+      lineHeight: 84,
+    },
+    countdownLabel: {
+      color: theme.accent,
+      fontSize: 22,
+      fontWeight: "800",
+      marginBottom: 4,
+    },
+    countdownSub: {
+      color: theme.textSecondary,
+      fontSize: 13,
+      marginBottom: 12,
+    },
+    phaseTrack: {
+      width: "100%",
+      height: 8,
+      backgroundColor: theme.surface,
+      overflow: "hidden",
+      marginBottom: 4,
+    },
+    phaseFill: { height: 8, backgroundColor: theme.accent },
     phaseLabel: { color: theme.textSecondary, fontSize: 12 },
 
     // Cards
-    card: { backgroundColor: theme.surface, borderRadius: 14, padding: 16, marginBottom: 14 },
-    cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-    cardTitle: { color: theme.textPrimary, fontSize: 16, fontWeight: "700" },
+    card: { backgroundColor: theme.surface, padding: 16, marginBottom: 14 },
+    cardHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 10,
+    },
+    cardTitle: {
+      color: theme.textPrimary,
+      fontSize: 11,
+      fontWeight: "500",
+      textTransform: "uppercase",
+      letterSpacing: 1.5,
+    },
     calTarget: { color: theme.textSecondary, fontSize: 13, marginTop: 8 },
 
     // Day type segment
     segRow: { flexDirection: "row", gap: 8, marginTop: 10 },
-    seg: { flex: 1, backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1, borderRadius: 8, paddingVertical: 10, alignItems: "center" },
+    seg: {
+      flex: 1,
+      backgroundColor: theme.background,
+      borderColor: theme.border,
+      borderWidth: 1,
+      paddingVertical: 10,
+      alignItems: "center",
+    },
     segActive: { backgroundColor: theme.accent, borderColor: theme.accent },
     segText: { color: theme.textPrimary, fontWeight: "600" },
     segTextActive: { color: "#FFFFFF" },
 
     // Steppers
-    stepperValue: { color: theme.textSecondary, fontSize: 14, fontWeight: "600" },
+    stepperValue: {
+      color: theme.textSecondary,
+      fontSize: 14,
+      fontWeight: "600",
+    },
     stepperValueDone: { color: "#22C55E" },
-    progressTrack: { height: 10, backgroundColor: theme.background, borderRadius: 5, overflow: "hidden", marginBottom: 12 },
-    progressFill: { height: 10, backgroundColor: theme.accent, borderRadius: 5 },
+    progressTrack: {
+      height: 10,
+      backgroundColor: theme.background,
+      overflow: "hidden",
+      marginBottom: 12,
+    },
+    progressFill: { height: 10, backgroundColor: theme.accent },
     progressFillDone: { backgroundColor: "#22C55E" },
     stepperRow: { flexDirection: "row", gap: 8 },
-    stepBtn: { flex: 1, backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1, borderRadius: 8, paddingVertical: 10, alignItems: "center" },
+    stepBtn: {
+      flex: 1,
+      backgroundColor: theme.background,
+      borderColor: theme.border,
+      borderWidth: 1,
+      paddingVertical: 10,
+      alignItems: "center",
+    },
     stepBtnActive: { borderColor: theme.accent },
     stepBtnText: { color: theme.textPrimary, fontWeight: "700", fontSize: 14 },
     customRow: { flexDirection: "row", gap: 8, marginTop: 10 },
-    customInput: { flex: 1, backgroundColor: theme.background, color: theme.textPrimary, borderColor: theme.border, borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 15 },
-    customAddBtn: { backgroundColor: theme.accent, borderRadius: 8, paddingHorizontal: 16, justifyContent: "center" },
+    customInput: {
+      flex: 1,
+      backgroundColor: theme.background,
+      color: theme.textPrimary,
+      borderColor: theme.border,
+      borderWidth: 1,
+      padding: 10,
+      fontSize: 15,
+    },
+    customAddBtn: {
+      backgroundColor: theme.accent,
+      paddingHorizontal: 16,
+      justifyContent: "center",
+    },
     customAddBtnText: { color: "#FFFFFF", fontWeight: "800" },
 
     // Supplements
     suppGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
-    suppChip: { backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 12 },
-    suppChipActive: { backgroundColor: theme.accent, borderColor: theme.accent },
+    suppChip: {
+      backgroundColor: theme.background,
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+    },
+    suppChipActive: {
+      backgroundColor: theme.accent,
+      borderColor: theme.accent,
+    },
     suppText: { color: theme.textSecondary, fontWeight: "600", fontSize: 13 },
     suppTextActive: { color: "#FFFFFF" },
 
     // Streaks
     streakRow: { flexDirection: "row", alignItems: "center", marginTop: 10 },
     streakItem: { flex: 1, alignItems: "center" },
-    streakNum: { fontSize: 40, fontWeight: "900", color: theme.textSecondary, lineHeight: 44 },
-    streakLabel: { color: theme.textSecondary, fontSize: 12, textAlign: "center", marginTop: 2 },
+    streakNum: {
+      fontSize: 40,
+      fontWeight: "900",
+      color: theme.textSecondary,
+      lineHeight: 44,
+    },
+    streakLabel: {
+      color: theme.textSecondary,
+      fontSize: 12,
+      textAlign: "center",
+      marginTop: 2,
+    },
     streakDivider: { width: 1, height: 56, marginHorizontal: 16 },
 
     // CTAs
-    logBtn: { backgroundColor: theme.accent, borderRadius: 12, paddingVertical: 18, alignItems: "center", marginBottom: 10 },
+    logBtn: {
+      backgroundColor: theme.accent,
+      paddingVertical: 18,
+      alignItems: "center",
+      marginBottom: 10,
+    },
     logBtnText: { color: "#FFFFFF", fontWeight: "900", fontSize: 17 },
-    morningPulseBtn: { backgroundColor: theme.surface, borderRadius: 12, paddingVertical: 14, alignItems: "center", borderWidth: 1, borderColor: theme.border },
-    morningPulseBtnText: { color: theme.textPrimary, fontWeight: "700", fontSize: 15 },
+    morningPulseBtn: {
+      backgroundColor: theme.surface,
+      paddingVertical: 14,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    morningPulseBtnText: {
+      color: theme.textPrimary,
+      fontWeight: "700",
+      fontSize: 15,
+    },
   });

@@ -8,21 +8,21 @@ export type AppTheme = {
 };
 
 export const DARK_THEME: AppTheme = {
-  background: "#121212",
-  surface: "#1E1E1E",
+  background: "#0A0A0A",
+  surface: "#111111",
   textPrimary: "#FFFFFF",
-  textSecondary: "#A1A1AA",
-  accent: "#F59E0B",
-  border: "#333333",
+  textSecondary: "#D4758A",
+  accent: "#CE1141",
+  border: "#2C2C2C",
 };
 
 export const LIGHT_THEME: AppTheme = {
-  background: "#F5F5F5",
+  background: "#EFEFEF",
   surface: "#FFFFFF",
-  textPrimary: "#000000",
-  textSecondary: "#52525B",
-  accent: "#D97706",
-  border: "#D4D4D8",
+  textPrimary: "#0A0A0A",
+  textSecondary: "#A84060",
+  accent: "#CE1141",
+  border: "#CCCCCC",
 };
 
 export function getThemeByMode(mode: "dark" | "light"): AppTheme {

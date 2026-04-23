@@ -1,13 +1,21 @@
-import { useCallback, useMemo, useState } from "react";
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { LineChart } from "react-native-chart-kit";
 import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useMemo, useState } from "react";
+import {
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { LineChart } from "react-native-chart-kit";
 import {
   getHabitLogsByHabitIds,
   getHabitsByNames,
   parseDayMonthYear,
 } from "../db/db-repo";
 import { useAppTheme } from "../state/theme-provider";
+import RawDataAdmin from "./RawDataAdmin";
 
 const chartWidth = Dimensions.get("window").width - 32;
 const expectedCurve = [90, 89, 88, 87, 86];
@@ -15,7 +23,10 @@ const PHASE_START = new Date("2026-04-07T00:00:00");
 
 function currentWeekNum(): number {
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-  return Math.min(7, Math.max(1, Math.ceil((Date.now() - PHASE_START.getTime()) / msPerWeek)));
+  return Math.min(
+    7,
+    Math.max(1, Math.ceil((Date.now() - PHASE_START.getTime()) / msPerWeek)),
+  );
 }
 
 type TimeView = "daily" | "weekly" | "monthly";
@@ -26,11 +37,15 @@ function startOfDay(value: Date): Date {
 }
 
 function weekKey(date: Date): string {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const d = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+  );
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNum = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  const weekNum = Math.ceil(
+    ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+  );
   return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, "0")}`;
 }
 
@@ -38,8 +53,9 @@ function monthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function clamp(num: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, num));
+function shortDayMonth(dateStr: string): string {
+  const d = parseDayMonthYear(dateStr);
+  return `${d.getDate()}/${d.getMonth() + 1}`;
 }
 
 export default function InsightsScreen() {
@@ -64,7 +80,9 @@ export default function InsightsScreen() {
         if (!active) return;
         const map = Object.fromEntries(habits.map((h) => [h.name, h.id]));
         setHabitMap(map);
-        setLogs((await getHabitLogsByHabitIds(habits.map((h) => h.id))) as LogRow[]);
+        setLogs(
+          (await getHabitLogsByHabitIds(habits.map((h) => h.id))) as LogRow[],
+        );
       })();
       return () => {
         active = false;
@@ -109,7 +127,8 @@ export default function InsightsScreen() {
   const scopedDates = useMemo(
     () =>
       Object.keys(byDate).sort(
-        (a, b) => parseDayMonthYear(a).getTime() - parseDayMonthYear(b).getTime(),
+        (a, b) =>
+          parseDayMonthYear(a).getTime() - parseDayMonthYear(b).getTime(),
       ),
     [byDate],
   );
@@ -160,7 +179,8 @@ export default function InsightsScreen() {
       .filter((x) => x.habitId === habitMap["Weigh-in"])
       .sort(
         (a, b) =>
-          parseDayMonthYear(a.date).getTime() - parseDayMonthYear(b.date).getTime(),
+          parseDayMonthYear(a.date).getTime() -
+          parseDayMonthYear(b.date).getTime(),
       );
 
     if (!weightLogs.length) {
@@ -173,7 +193,7 @@ export default function InsightsScreen() {
     if (timeView === "daily") {
       const last = weightLogs.slice(-7);
       return {
-        labels: last.map((row) => row.date),
+        labels: last.map((row) => shortDayMonth(row.date)),
         actual: last.map((row) => Number(row.value)),
       };
     }
@@ -199,21 +219,6 @@ export default function InsightsScreen() {
     };
   }, [habitMap, logs, timeView]);
 
-  const grade = (() => {
-    const trainingTarget = timeView === "daily" ? 1 : timeView === "weekly" ? 4 : 16;
-    const trainingScore = clamp(trainingSessions / trainingTarget, 0, 1) * 30;
-    const nutritionScore =
-      ((calorieAdherence + proteinConsistency) / 2 / 100) * 40;
-    const supplementsScore = 20;
-    const recoveryScore = 8;
-    const total =
-      trainingScore + nutritionScore + supplementsScore + recoveryScore;
-    if (total >= 85) return "A";
-    if (total >= 70) return "B";
-    if (total >= 55) return "C";
-    return "Missed";
-  })();
-
   const expectedSeries = useMemo(() => {
     const len = chartData.labels.length || 5;
     if (len <= expectedCurve.length) {
@@ -231,14 +236,21 @@ export default function InsightsScreen() {
     </View>
   );
 
-  const periodLabel = timeView === "daily" ? "Daily" : timeView === "weekly" ? "Weekly" : "Monthly";
+  const periodLabel =
+    timeView === "daily"
+      ? "Daily"
+      : timeView === "weekly"
+        ? "Weekly"
+        : "Monthly";
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 24 }}
     >
-      <Text style={styles.header}>Phase Progress: Week {currentWeekNum()} of 7</Text>
+      <Text style={styles.header}>
+        Phase Progress: Week {currentWeekNum()} of 7
+      </Text>
 
       <View style={styles.segmentRow}>
         {(["daily", "weekly", "monthly"] as TimeView[]).map((value) => {
@@ -249,7 +261,12 @@ export default function InsightsScreen() {
               style={[styles.segment, selected && styles.segmentActive]}
               onPress={() => setTimeView(value)}
             >
-              <Text style={[styles.segmentText, selected && styles.segmentTextActive]}>
+              <Text
+                style={[
+                  styles.segmentText,
+                  selected && styles.segmentTextActive,
+                ]}
+              >
                 {value[0].toUpperCase() + value.slice(1)}
               </Text>
             </TouchableOpacity>
@@ -258,13 +275,24 @@ export default function InsightsScreen() {
       </View>
 
       <View style={styles.grid}>
-        <Card title={`${periodLabel} Calorie Adherence`} value={`${calorieAdherence}%`} />
-        <Card title={`${periodLabel} Protein Consistency`} value={`${proteinConsistency}%`} />
-        <Card title={`${periodLabel} Training Sessions`} value={`${trainingSessions}`} />
+        <Card
+          title={`${periodLabel} Calorie Adherence`}
+          value={`${calorieAdherence}%`}
+        />
+        <Card
+          title={`${periodLabel} Protein Consistency`}
+          value={`${proteinConsistency}%`}
+        />
+        <Card
+          title={`${periodLabel} Training Sessions`}
+          value={`${trainingSessions}`}
+        />
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.primary}>{`${periodLabel} Weight Trend (Actual vs Expected)`}</Text>
+        <Text
+          style={styles.primary}
+        >{`${periodLabel} Weight Trend (Actual vs Expected)`}</Text>
         <LineChart
           width={chartWidth}
           height={220}
@@ -272,13 +300,15 @@ export default function InsightsScreen() {
             labels: chartData.labels,
             datasets: [
               {
-                data: chartData.actual.length ? chartData.actual : expectedCurve,
+                data: chartData.actual.length
+                  ? chartData.actual
+                  : expectedCurve,
                 color: () => theme.accent,
                 strokeWidth: 2,
               },
               {
                 data: expectedSeries,
-                color: () => "#A1A1AA",
+                color: () => "#2563EB",
                 strokeWidth: 2,
               },
             ],
@@ -294,14 +324,11 @@ export default function InsightsScreen() {
             propsForDots: { r: "3" },
           }}
           bezier
-          style={{ marginTop: 12, borderRadius: 8 }}
+          style={{ marginTop: 12 }}
         />
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.secondary}>{`${periodLabel} Phase Completion Score`}</Text>
-        <Text style={styles.primary}>{grade}</Text>
-      </View>
+      <RawDataAdmin />
     </ScrollView>
   );
 }
@@ -309,13 +336,19 @@ export default function InsightsScreen() {
 const createStyles = (theme: any) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background, padding: 16 },
-    header: { color: theme.textPrimary, fontSize: 18, marginBottom: 10, fontWeight: "700" },
+    header: {
+      color: theme.textPrimary,
+      fontSize: 11,
+      marginBottom: 10,
+      fontWeight: "500",
+      textTransform: "uppercase",
+      letterSpacing: 1.5,
+    },
     segmentRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
     segment: {
       backgroundColor: theme.surface,
       borderColor: theme.border,
       borderWidth: 1,
-      borderRadius: 8,
       paddingVertical: 8,
       paddingHorizontal: 12,
     },
@@ -328,7 +361,6 @@ const createStyles = (theme: any) =>
     grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 10 },
     card: {
       backgroundColor: theme.surface,
-      borderRadius: 8,
       padding: 16,
       marginBottom: 10,
       flexGrow: 1,

@@ -200,7 +200,6 @@ const createStyles = (theme: any) =>
       color: theme.textPrimary,
       borderColor: theme.border,
       borderWidth: 1,
-      borderRadius: 12,
       padding: 16,
       fontSize: 18,
       marginBottom: 18,
@@ -213,7 +212,6 @@ const createStyles = (theme: any) =>
     },
     moodChip: {
       backgroundColor: theme.surface,
-      borderRadius: 12,
       padding: 14,
       alignItems: "center",
       borderWidth: 2,
@@ -226,7 +224,6 @@ const createStyles = (theme: any) =>
     moodLabelActive: { color: theme.accent },
     saveBtn: {
       backgroundColor: theme.accent,
-      borderRadius: 14,
       paddingVertical: 18,
       alignItems: "center",
       marginBottom: 12,

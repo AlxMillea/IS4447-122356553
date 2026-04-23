@@ -1,6 +1,7 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
 import {
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -181,7 +182,16 @@ export default function RawDataAdmin() {
         </View>
         {!!historyStatus && <Text style={styles.status}>{historyStatus}</Text>}
         {filteredHistory.length === 0
-          ? <Text style={styles.empty}>No records match your filters.</Text>
+          ? (
+            <View style={styles.emptyState}>
+              <Image
+                source={require("../assets/images/ChicagoImage.jpg")}
+                style={styles.emptyImage}
+                resizeMode="contain"
+              />
+              <Text style={styles.empty}>No records match your filters.</Text>
+            </View>
+          )
           : filteredHistory.map((row) => (
             <View key={row.id} style={styles.historyRow}>
               <View style={{ flex: 1 }}>
@@ -233,30 +243,31 @@ const createStyles = (theme: any) =>
   StyleSheet.create({
     requirementBadge: {
       backgroundColor: "#1A3A1A",
-      borderRadius: 8,
       padding: 10,
       marginBottom: 12,
       borderWidth: 1,
       borderColor: "#22C55E",
     },
     requirementText: { color: "#22C55E", fontWeight: "700", fontSize: 12 },
-    card: { backgroundColor: theme.surface, borderRadius: 12, padding: 16, marginBottom: 14 },
-    cardTitle: { color: theme.textPrimary, fontSize: 16, fontWeight: "700", marginBottom: 12 },
+    card: { backgroundColor: theme.surface, padding: 16, marginBottom: 14 },
+    cardTitle: { color: theme.textPrimary, fontSize: 11, fontWeight: "500", marginBottom: 12, textTransform: "uppercase", letterSpacing: 1.5 },
     label: { color: theme.textSecondary, fontSize: 13, marginBottom: 4 },
-    input: { backgroundColor: theme.background, color: theme.textPrimary, borderColor: theme.border, borderWidth: 1, borderRadius: 8, padding: 10, marginBottom: 8 },
+    input: { backgroundColor: theme.background, color: theme.textPrimary, borderColor: theme.border, borderWidth: 1, padding: 10, marginBottom: 8 },
     chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
-    chip: { backgroundColor: theme.background, borderWidth: 1, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 10 },
+    chip: { backgroundColor: theme.background, borderWidth: 1, paddingVertical: 6, paddingHorizontal: 10 },
     chipText: { color: theme.textPrimary, fontWeight: "600", fontSize: 12 },
     chipTextActive: { color: "#FFFFFF" },
-    accentBtn: { backgroundColor: theme.accent, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10 },
+    accentBtn: { backgroundColor: theme.accent, paddingVertical: 8, paddingHorizontal: 10 },
     accentBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
-    cancelBtn: { backgroundColor: "#E2E8F0", borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10 },
+    cancelBtn: { backgroundColor: "#E2E8F0", paddingVertical: 8, paddingHorizontal: 10 },
     cancelBtnText: { color: "#0F172A", fontWeight: "700", fontSize: 13 },
-    deleteBtn: { backgroundColor: "#FEE2E2", borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10 },
+    deleteBtn: { backgroundColor: "#FEE2E2", paddingVertical: 8, paddingHorizontal: 10 },
     deleteBtnText: { color: "#B91C1C", fontWeight: "700", fontSize: 13 },
     historyRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", borderTopColor: theme.border, borderTopWidth: 1, paddingTop: 10, marginTop: 10 },
     rowText: { color: theme.textPrimary, marginBottom: 4, fontSize: 13 },
     rowSub: { color: theme.textSecondary, fontSize: 12 },
     status: { color: theme.accent, marginTop: 6, fontSize: 13 },
+    emptyState: { alignItems: "center", paddingVertical: 16 },
+    emptyImage: { width: "100%", height: 140, marginBottom: 12 },
     empty: { color: theme.textSecondary, textAlign: "center", paddingVertical: 16 },
   });

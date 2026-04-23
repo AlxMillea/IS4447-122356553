@@ -9,10 +9,10 @@ function formatDayMonthYear(date: Date): string {
 
 async function insertChicagoCountdownData(tx: any) {
   await tx.insert(categories).values([
-    { name: "Train", color: CATEGORY_COLORS.Train},
-    { name: "Fuel", color: CATEGORY_COLORS.Fuel},
-    { name: "Recover", color: CATEGORY_COLORS.Recover},
-    { name: "Measure", color: CATEGORY_COLORS.Measure},
+    { name: "Train", color: CATEGORY_COLORS.Train, icon: "" },
+    { name: "Fuel", color: CATEGORY_COLORS.Fuel, icon: "" },
+    { name: "Recover", color: CATEGORY_COLORS.Recover, icon: "" },
+    { name: "Measure", color: CATEGORY_COLORS.Measure, icon: "" },
   ]);
 
   const categoryRows = await tx.select().from(categories);
@@ -286,7 +286,7 @@ export async function seedIfEmpty() {
     ),
   );
   const hasCategoryIcons = categoryRows.every(
-    (category) => category.icon && String(category.icon).trim().length > 0,
+    (category) => category.icon !== null && category.icon !== undefined,
   );
 
   const shouldReseedExisting =

@@ -10,7 +10,6 @@ import { exportDataToCSV } from "../db/db-repo";
 import { useAppTheme } from "../state/theme-provider";
 import CategoriesScreen from "./CategoriesScreen";
 import HevyImport from "./HevyImport";
-import RawDataAdmin from "./RawDataAdmin";
 
 export default function SettingsScreen() {
   const { mode, setMode, theme } = useAppTheme();
@@ -62,7 +61,6 @@ export default function SettingsScreen() {
         <HevyImport />
       </View>
 
-      <RawDataAdmin />
     </ScrollView>
   );
 }
@@ -73,22 +71,22 @@ const createStyles = (theme: any) =>
     content: { padding: 16, paddingBottom: 40 },
     card: {
       backgroundColor: theme.surface,
-      borderRadius: 10,
       padding: 12,
       marginBottom: 12,
     },
     title: {
       color: theme.textPrimary,
-      fontWeight: "700",
+      fontWeight: "500",
       marginBottom: 10,
-      fontSize: 15,
+      fontSize: 11,
+      textTransform: "uppercase",
+      letterSpacing: 1.5,
     },
     row: { flexDirection: "row", gap: 8 },
     button: {
       backgroundColor: theme.background,
       borderColor: theme.border,
       borderWidth: 1,
-      borderRadius: 8,
       paddingVertical: 10,
       paddingHorizontal: 14,
     },
@@ -96,7 +94,6 @@ const createStyles = (theme: any) =>
     buttonText: { color: theme.textPrimary, fontWeight: "700" },
     exportBtn: {
       backgroundColor: theme.accent,
-      borderRadius: 8,
       paddingVertical: 12,
       alignItems: "center",
     },
